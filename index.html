@@ -172,6 +172,8 @@ hr { border: 0; border-top: 1px solid var(--line-soft); margin: 8px 0; }
     <button id="rewindBtn">先頭</button>
     <button id="playBtn">停止</button>
     <button id="loopBtn" class="toggle-on">Loop</button>
+    <button id="undoBtn">Undo</button>
+    <button id="redoBtn">Redo</button>
   </div>
   <div class="top-group">
     <span class="top-label">BPM</span>
@@ -983,6 +985,8 @@ const state = {
   selectedLayerId: null,
   selectedKey: null,
   keyClipboard: null,
+  pendingParamHistory: null,
+  history: { past: [], future: [] },
   categoriesOpen: Object.fromEntries(EFFECT_CATEGORIES.map(cat => [cat.key, true])),
   panels: { leftW: 280, rightW: 330, bottomH: 210 },
   recording: false,
@@ -1476,6 +1480,8 @@ document.getElementById('tapBpm').addEventListener('click', () => {
 const playBtn = document.getElementById('playBtn');
 const rewindBtn = document.getElementById('rewindBtn');
 const loopBtn = document.getElementById('loopBtn');
+const undoBtn = document.getElementById('undoBtn');
+const redoBtn = document.getElementById('redoBtn');
 const durationInput = document.getElementById('durationInput');
 const timeModeSelect = document.getElementById('timeModeSelect');
 const snapSelect = document.getElementById('snapSelect');
@@ -1487,9 +1493,74 @@ let loopRangeEl = null;
 let inMarkerEl = null;
 let outMarkerEl = null;
 
+function cloneData(v) {
+  return JSON.parse(JSON.stringify(v));
+}
+
+function snapshotState() {
+  return {
+    layers: cloneData(state.layers),
+    nextLayerSeq: state.nextLayerSeq,
+    selectedLayerId: state.selectedLayerId,
+    selectedKey: state.selectedKey ? {...state.selectedKey} : null,
+    comp: {...state.comp},
+    bpm: state.bpm
+  };
+}
+
+function restoreSnapshot(snap) {
+  state.layers = cloneData(snap.layers);
+  state.nextLayerSeq = snap.nextLayerSeq;
+  state.selectedLayerId = snap.selectedLayerId;
+  state.selectedKey = snap.selectedKey ? {...snap.selectedKey} : null;
+  state.comp = {...snap.comp};
+  state.bpm = snap.bpm;
+  bpmInput.value = state.bpm.toFixed(1);
+  setTimelineTime(state.play.time);
+  syncTimelineControls();
+  rebuildTimelineRuler();
+  refreshFxUI();
+}
+
+function updateHistoryButtons() {
+  undoBtn.disabled = !state.history.past.length;
+  redoBtn.disabled = !state.history.future.length;
+}
+
+function pushHistory(label, before, after = snapshotState()) {
+  if (JSON.stringify(before) === JSON.stringify(after)) return;
+  state.history.past.push({label, before, after});
+  if (state.history.past.length > 100) state.history.past.shift();
+  state.history.future = [];
+  updateHistoryButtons();
+}
+
+function runCommand(label, fn) {
+  const before = snapshotState();
+  fn();
+  pushHistory(label, before);
+}
+
+function undo() {
+  const cmd = state.history.past.pop();
+  if (!cmd) return;
+  state.history.future.push(cmd);
+  restoreSnapshot(cmd.before);
+  updateHistoryButtons();
+}
+
+function redo() {
+  const cmd = state.history.future.pop();
+  if (!cmd) return;
+  state.history.past.push(cmd);
+  restoreSnapshot(cmd.after);
+  updateHistoryButtons();
+}
+
 function updateTransportButtons() {
   playBtn.textContent = state.play.playing ? '停止' : '再生';
   loopBtn.classList.toggle('toggle-on', state.comp.loop);
+  updateHistoryButtons();
 }
 
 function syncTimelineControls() {
@@ -1608,18 +1679,24 @@ loopBtn.addEventListener('click', () => {
   state.comp.loop = !state.comp.loop;
   updateTransportButtons();
 });
-durationInput.addEventListener('change', e => setDuration(e.target.value));
+undoBtn.addEventListener('click', undo);
+redoBtn.addEventListener('click', redo);
+durationInput.addEventListener('change', e => runCommand('Change duration', () => setDuration(e.target.value)));
 timeModeSelect.addEventListener('change', e => {
-  state.comp.timeMode = e.target.value;
-  syncTimelineControls();
-  rebuildTimelineRuler();
+  runCommand('Change time mode', () => {
+    state.comp.timeMode = e.target.value;
+    syncTimelineControls();
+    rebuildTimelineRuler();
+  });
 });
 snapSelect.addEventListener('change', e => {
-  state.comp.snap = e.target.value;
-  syncTimelineControls();
+  runCommand('Change snap', () => {
+    state.comp.snap = e.target.value;
+    syncTimelineControls();
+  });
 });
-inPointInput.addEventListener('change', e => setInPoint(e.target.value));
-outPointInput.addEventListener('change', e => setOutPoint(e.target.value));
+inPointInput.addEventListener('change', e => runCommand('Set In point', () => setInPoint(e.target.value)));
+outPointInput.addEventListener('change', e => runCommand('Set Out point', () => setOutPoint(e.target.value)));
 
 let rulerDragging = false;
 timelineRuler.addEventListener('pointerdown', e => {
@@ -1763,47 +1840,57 @@ function selectLayer(lid) {
   refreshFxUI();
 }
 function addLayer(effId) {
-  const def = effectDef(effId);
-  const layer = createLayer(effId, {enabled: true});
-  if (!layer || !def) return;
-  state.layers.push(layer);
-  state.selectedLayerId = layer.lid;
-  if (def.st !== 'mon') getProg(def);
-  refreshFxUI();
+  runCommand('Add layer', () => {
+    const def = effectDef(effId);
+    const layer = createLayer(effId, {enabled: true});
+    if (!layer || !def) return;
+    state.layers.push(layer);
+    state.selectedLayerId = layer.lid;
+    if (def.st !== 'mon') getProg(def);
+    refreshFxUI();
+  });
 }
 function duplicateLayer(lid) {
-  const src = layerState(lid);
-  if (!src) return;
-  const copy = createLayer(src.effId, {enabled: src.enabled, values: {...src.values}, keyframes: src.keyframes, open: src.open});
-  if (!copy) return;
-  const idx = state.layers.findIndex(layer => layer.lid === lid);
-  state.layers.splice(idx + 1, 0, copy);
-  state.selectedLayerId = copy.lid;
-  refreshFxUI();
+  runCommand('Duplicate layer', () => {
+    const src = layerState(lid);
+    if (!src) return;
+    const copy = createLayer(src.effId, {enabled: src.enabled, values: {...src.values}, keyframes: src.keyframes, open: src.open});
+    if (!copy) return;
+    const idx = state.layers.findIndex(layer => layer.lid === lid);
+    state.layers.splice(idx + 1, 0, copy);
+    state.selectedLayerId = copy.lid;
+    refreshFxUI();
+  });
 }
 function deleteLayer(lid) {
-  const idx = state.layers.findIndex(layer => layer.lid === lid);
-  if (idx < 0) return;
-  state.layers.splice(idx, 1);
-  if (state.selectedKey?.lid === lid) state.selectedKey = null;
-  state.selectedLayerId = state.layers[Math.min(idx, state.layers.length - 1)]?.lid || null;
-  refreshFxUI();
+  runCommand('Delete layer', () => {
+    const idx = state.layers.findIndex(layer => layer.lid === lid);
+    if (idx < 0) return;
+    state.layers.splice(idx, 1);
+    if (state.selectedKey?.lid === lid) state.selectedKey = null;
+    state.selectedLayerId = state.layers[Math.min(idx, state.layers.length - 1)]?.lid || null;
+    refreshFxUI();
+  });
 }
 function moveLayer(lid, delta) {
-  const idx = state.layers.findIndex(layer => layer.lid === lid);
-  const next = idx + delta;
-  if (idx < 0 || next < 0 || next >= state.layers.length) return;
-  [state.layers[idx], state.layers[next]] = [state.layers[next], state.layers[idx]];
-  refreshFxUI();
+  runCommand('Move layer', () => {
+    const idx = state.layers.findIndex(layer => layer.lid === lid);
+    const next = idx + delta;
+    if (idx < 0 || next < 0 || next >= state.layers.length) return;
+    [state.layers[idx], state.layers[next]] = [state.layers[next], state.layers[idx]];
+    refreshFxUI();
+  });
 }
 function toggleLayer(lid, enabled) {
-  const layer = layerState(lid);
-  const def = layer && effectDef(layer.effId);
-  if (!layer || !def) return;
-  layer.enabled = enabled;
-  if (layer.enabled && def.st !== 'mon') getProg(def);
-  state.selectedLayerId = lid;
-  refreshFxUI();
+  runCommand('Toggle layer', () => {
+    const layer = layerState(lid);
+    const def = layer && effectDef(layer.effId);
+    if (!layer || !def) return;
+    layer.enabled = enabled;
+    if (layer.enabled && def.st !== 'mon') getProg(def);
+    state.selectedLayerId = lid;
+    refreshFxUI();
+  });
 }
 function toggleLayerOpen(lid) {
   const layer = layerState(lid);
@@ -1818,30 +1905,34 @@ function selectKey(lid, paramKey, idx) {
   refreshFxUI();
 }
 function addKeyframe(lid, paramKey) {
-  const layer = layerState(lid);
-  if (!layer) return;
-  const value = evaluateLayerValues(layer, state.play.time)[paramKey] ?? layer.values[paramKey];
-  if (!layer.keyframes[paramKey]) layer.keyframes[paramKey] = [];
-  const keys = layer.keyframes[paramKey];
-  const t = snapTime(state.play.time);
-  const existing = keys.findIndex(k => Math.abs(k.t - t) < 1 / 120);
-  if (existing >= 0) keys[existing].v = value;
-  else keys.push({t, v: value});
-  sortedKeyframes(layer, paramKey);
-  const idx = keys.findIndex(k => Math.abs(k.t - t) < 1 / 120);
-  state.selectedKey = {lid, paramKey, idx};
-  state.selectedLayerId = lid;
-  refreshFxUI();
+  runCommand('Add keyframe', () => {
+    const layer = layerState(lid);
+    if (!layer) return;
+    const value = evaluateLayerValues(layer, state.play.time)[paramKey] ?? layer.values[paramKey];
+    if (!layer.keyframes[paramKey]) layer.keyframes[paramKey] = [];
+    const keys = layer.keyframes[paramKey];
+    const t = snapTime(state.play.time);
+    const existing = keys.findIndex(k => Math.abs(k.t - t) < 1 / 120);
+    if (existing >= 0) keys[existing].v = value;
+    else keys.push({t, v: value});
+    sortedKeyframes(layer, paramKey);
+    const idx = keys.findIndex(k => Math.abs(k.t - t) < 1 / 120);
+    state.selectedKey = {lid, paramKey, idx};
+    state.selectedLayerId = lid;
+    refreshFxUI();
+  });
 }
 function deleteSelectedKey() {
-  const sel = state.selectedKey;
-  const layer = sel && layerState(sel.lid);
-  const keys = layer && layer.keyframes[sel.paramKey];
-  if (!keys || !keys[sel.idx]) return;
-  keys.splice(sel.idx, 1);
-  if (!keys.length) delete layer.keyframes[sel.paramKey];
-  state.selectedKey = null;
-  refreshFxUI();
+  runCommand('Delete keyframe', () => {
+    const sel = state.selectedKey;
+    const layer = sel && layerState(sel.lid);
+    const keys = layer && layer.keyframes[sel.paramKey];
+    if (!keys || !keys[sel.idx]) return;
+    keys.splice(sel.idx, 1);
+    if (!keys.length) delete layer.keyframes[sel.paramKey];
+    state.selectedKey = null;
+    refreshFxUI();
+  });
 }
 function moveKey(lid, paramKey, idx, t, refresh = true) {
   const layer = layerState(lid);
@@ -1862,18 +1953,31 @@ function copySelectedKey() {
   state.keyClipboard = {paramKey: sel.paramKey, v: key.v};
 }
 function pasteKeyClipboard() {
-  if (!state.keyClipboard || !state.selectedLayerId) return;
-  const layer = layerState(state.selectedLayerId);
-  if (!layer) return;
-  const paramKey = state.keyClipboard.paramKey;
-  if (!(paramKey in layer.values)) return;
-  if (!layer.keyframes[paramKey]) layer.keyframes[paramKey] = [];
-  const t = snapTime(state.play.time);
-  layer.keyframes[paramKey].push({t, v: state.keyClipboard.v});
-  sortedKeyframes(layer, paramKey);
-  const idx = layer.keyframes[paramKey].findIndex(k => Math.abs(k.t - t) < 1 / 120);
-  state.selectedKey = {lid: layer.lid, paramKey, idx};
-  refreshFxUI();
+  runCommand('Paste keyframe', () => {
+    if (!state.keyClipboard || !state.selectedLayerId) return;
+    const layer = layerState(state.selectedLayerId);
+    if (!layer) return;
+    const paramKey = state.keyClipboard.paramKey;
+    if (!(paramKey in layer.values)) return;
+    if (!layer.keyframes[paramKey]) layer.keyframes[paramKey] = [];
+    const t = snapTime(state.play.time);
+    layer.keyframes[paramKey].push({t, v: state.keyClipboard.v});
+    sortedKeyframes(layer, paramKey);
+    const idx = layer.keyframes[paramKey].findIndex(k => Math.abs(k.t - t) < 1 / 120);
+    state.selectedKey = {lid: layer.lid, paramKey, idx};
+    refreshFxUI();
+  });
+}
+function scheduleParamHistory(label, before) {
+  if (!state.pendingParamHistory) {
+    state.pendingParamHistory = {label, before, timer: null};
+  }
+  clearTimeout(state.pendingParamHistory.timer);
+  state.pendingParamHistory.timer = setTimeout(() => {
+    const pending = state.pendingParamHistory;
+    state.pendingParamHistory = null;
+    pushHistory(pending.label, pending.before);
+  }, 250);
 }
 function randomParamValue(param) {
   if (param.type === 'color') {
@@ -2092,6 +2196,7 @@ function setupKeyMarker(marker) {
   });
   marker.addEventListener('pointerdown', e => {
     e.stopPropagation();
+    const before = snapshotState();
     marker.setPointerCapture(e.pointerId);
     state.selectedLayerId = marker.dataset.lid;
     state.selectedKey = {
@@ -2116,6 +2221,7 @@ function setupKeyMarker(marker) {
       marker.removeEventListener('pointerup', up);
       const layer = layerState(marker.dataset.lid);
       if (layer) sortedKeyframes(layer, marker.dataset.param);
+      pushHistory('Move keyframe', before);
       refreshFxUI();
     };
     marker.addEventListener('pointermove', move);
@@ -2150,9 +2256,14 @@ function makeRange(layer, p) {
   inp.value = layer.values[p.key] ?? 0;
   const v = document.createElement('span'); v.className = 'v';
   v.textContent = (+inp.value).toFixed(2);
+  let before = null;
+  inp.addEventListener('pointerdown', () => { before = snapshotState(); });
+  inp.addEventListener('pointerup', () => setTimeout(() => { before = null; }, 300));
   inp.addEventListener('input', () => {
+    if (!before) before = snapshotState();
     layer.values[p.key] = parseFloat(inp.value);
     v.textContent = parseFloat(inp.value).toFixed(2);
+    scheduleParamHistory('Change parameter', before);
   });
   const keyBtn = document.createElement('button');
   keyBtn.className = 'keybtn';
@@ -2168,7 +2279,14 @@ function makeColor(layer, x) {
   const lab = document.createElement('label'); lab.textContent = x.label;
   const inp = document.createElement('input');
   inp.type = 'color'; inp.value = layer.values[x.key] || x.def;
-  inp.addEventListener('input', () => { layer.values[x.key] = inp.value; });
+  let before = null;
+  inp.addEventListener('pointerdown', () => { before = snapshotState(); });
+  inp.addEventListener('pointerup', () => setTimeout(() => { before = null; }, 300));
+  inp.addEventListener('input', () => {
+    if (!before) before = snapshotState();
+    layer.values[x.key] = inp.value;
+    scheduleParamHistory('Change color', before);
+  });
   const keyBtn = document.createElement('button');
   keyBtn.className = 'keybtn';
   keyBtn.textContent = '◆';
@@ -2230,6 +2348,7 @@ function importPreset(file) {
   const r = new FileReader();
   r.onload = () => {
     try {
+      const before = snapshotState();
       const data = JSON.parse(r.result);
       if (data.bpm) { state.bpm = data.bpm; bpmInput.value = data.bpm; }
       if (data.comp) {
@@ -2260,6 +2379,7 @@ function importPreset(file) {
         state.selectedLayerId = state.layers[0]?.lid || null;
       }
       refreshFxUI();
+      pushHistory('Import preset', before);
     } catch (e) { alert('プリセット読込失敗: ' + e.message); }
   };
   r.readAsText(file);
@@ -2271,39 +2391,43 @@ document.getElementById('presetFile').addEventListener('change', e => {
   if (e.target.files[0]) importPreset(e.target.files[0]);
 });
 document.getElementById('presetClear').addEventListener('click', () => {
-  state.layers = [];
-  state.selectedLayerId = null;
-  refreshFxUI();
+  runCommand('Clear preset', () => {
+    state.layers = [];
+    state.selectedLayerId = null;
+    refreshFxUI();
+  });
 });
 document.getElementById('presetRand').addEventListener('click', () => {
-  state.layers = [];
-  // pick 3-7 effects randomly
-  const candidates = EFFECTS.filter(def => def.st !== 'mon');
-  const n = 3 + Math.floor(Math.random() * 5);
-  for (let i = candidates.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i+1));
-    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
-  }
-  candidates.slice(0, n).forEach(def => {
-    const layer = createLayer(def.id, {enabled: true});
-    if (!layer) return;
-    layer.values.amount = 0.2 + Math.random() * 0.7;
-    layer.values.speed  = Math.random();
-    layer.values.mix    = 0.5 + Math.random() * 0.5;
-    layer.values.bpmSync = Math.random() < 0.4 ? Math.random() * 0.6 : 0;
-    layer.values.audioReactive = Math.random() < 0.4 ? Math.random() * 0.6 : 0;
-    if (def.extras) def.extras.forEach(x => {
-      if (x.type === 'color') {
-        layer.values[x.key] = '#' + Math.floor(Math.random()*0xffffff).toString(16).padStart(6,'0');
-      } else {
-        layer.values[x.key] = x.min + Math.random() * (x.max - x.min);
-      }
+  runCommand('Random preset', () => {
+    state.layers = [];
+    // pick 3-7 effects randomly
+    const candidates = EFFECTS.filter(def => def.st !== 'mon');
+    const n = 3 + Math.floor(Math.random() * 5);
+    for (let i = candidates.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i+1));
+      [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+    }
+    candidates.slice(0, n).forEach(def => {
+      const layer = createLayer(def.id, {enabled: true});
+      if (!layer) return;
+      layer.values.amount = 0.2 + Math.random() * 0.7;
+      layer.values.speed  = Math.random();
+      layer.values.mix    = 0.5 + Math.random() * 0.5;
+      layer.values.bpmSync = Math.random() < 0.4 ? Math.random() * 0.6 : 0;
+      layer.values.audioReactive = Math.random() < 0.4 ? Math.random() * 0.6 : 0;
+      if (def.extras) def.extras.forEach(x => {
+        if (x.type === 'color') {
+          layer.values[x.key] = '#' + Math.floor(Math.random()*0xffffff).toString(16).padStart(6,'0');
+        } else {
+          layer.values[x.key] = x.min + Math.random() * (x.max - x.min);
+        }
+      });
+      randomizeLayerKeyframes(layer, def);
+      state.layers.push(layer);
     });
-    randomizeLayerKeyframes(layer, def);
-    state.layers.push(layer);
+    state.selectedLayerId = state.layers[0]?.lid || null;
+    refreshFxUI();
   });
-  state.selectedLayerId = state.layers[0]?.lid || null;
-  refreshFxUI();
 });
 
 // ===================================================================
@@ -2402,6 +2526,17 @@ document.getElementById('hidePanelBtn').addEventListener('click', () => {
 document.addEventListener('fullscreenchange', () => setTimeout(resizeCanvas, 50));
 document.addEventListener('keydown', e => {
   if (e.target.matches('input,textarea,select')) return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+    e.preventDefault();
+    if (e.shiftKey) redo();
+    else undo();
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+    e.preventDefault();
+    redo();
+    return;
+  }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
     copySelectedKey();
     return;
