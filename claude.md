@@ -47,11 +47,11 @@
 - [x] レンダ時はキーフレーム評価値を `eff.values` に上書き
 - [x] **E4**: キーフレームコピペ (Ctrl+C/V) — 現在選択キー → 現在時刻に貼付
 
-### Phase 4 — 録画範囲 & MP4 出力  ⏳
-- [ ] In/Out 区間だけ録画 (再生位置を In に飛ばし→ Out に到達で自動停止)
-- [ ] **A1**: `MediaRecorder` で `video/mp4;codecs=avc1` 優先 → WebM フォールバック
-- [ ] 録画中の状態表示・進捗バー
-- [ ] 拡張子は実際の出力形式に合わせて `.mp4` or `.webm`
+### Phase 4 — 録画範囲 & MP4 出力  ✅
+- [x] In/Out 区間だけ録画 (再生位置を In に飛ばし→ Out に到達で自動停止)
+- [x] **A1**: `MediaRecorder` で `video/mp4;codecs=avc1` 優先 → WebM フォールバック
+- [x] 録画中の状態表示・進捗バー
+- [x] 拡張子は実際の出力形式に合わせて `.mp4` or `.webm`
 
 ### Phase 5 — プリセット拡張  ⏳
 - [ ] **E3**: プリセット JSON にキーフレームと composition / scenes 設定を含める

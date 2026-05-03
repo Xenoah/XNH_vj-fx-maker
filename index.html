@@ -155,6 +155,8 @@ canvas#view { display: block; max-width: 100%; max-height: 100%; background: #00
 
 .recRing { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #d44; margin-right: 4px; vertical-align: middle; animation: blink 1s infinite; }
 @keyframes blink { 50% { opacity: 0.3; } }
+.recProgress { display: inline-block; width: 90px; height: 5px; margin-left: 6px; background: #101318; border: 1px solid #2a2e36; vertical-align: middle; }
+.recProgress span { display: block; height: 100%; background: #d44; width: 0%; }
 
 #fpsInfo { font-family: ui-monospace, Consolas, monospace; color: #aeb6c5; }
 .note { font-size: 10px; color: #6a7180; margin-top: 4px; line-height: 1.4; }
@@ -986,7 +988,10 @@ const state = {
   recording: false,
   recorder: null,
   recChunks: [],
-  recStartTime: 0
+  recStartTime: 0,
+  recMime: '',
+  recExt: 'webm',
+  recPrevLoop: true
 };
 
 // ===================================================================
@@ -1380,6 +1385,9 @@ function render() {
   document.getElementById('audioBar').value = Math.min(1, state.audio.level);
   document.getElementById('timecode').textContent = formatTime(t);
   updateTimelineVisuals();
+  if (state.recording && !state.play.playing && state.play.time >= state.comp.outPoint - 1 / 120) {
+    stopRec();
+  }
 
   requestAnimationFrame(render);
 }
@@ -2271,7 +2279,13 @@ recBtn.addEventListener('click', () => {
   else stopRec();
 });
 function pickMime() {
-  const mimes = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+  const mimes = [
+    'video/mp4;codecs=avc1.42E01E',
+    'video/mp4;codecs=avc1',
+    'video/webm;codecs=vp9',
+    'video/webm;codecs=vp8',
+    'video/webm'
+  ];
   for (const m of mimes) if (MediaRecorder.isTypeSupported(m)) return m;
   return '';
 }
@@ -2279,16 +2293,24 @@ function startRec() {
   try {
     const stream = canvas.captureStream(60);
     const mime = pickMime();
+    state.recMime = mime || 'video/webm';
+    state.recExt = state.recMime.startsWith('video/mp4') ? 'mp4' : 'webm';
     state.recorder = new MediaRecorder(stream, mime ? {mimeType: mime, videoBitsPerSecond: 8000000} : {});
     state.recChunks = [];
     state.recorder.ondataavailable = e => { if (e.data.size > 0) state.recChunks.push(e.data); };
     state.recorder.onstop = () => {
-      const blob = new Blob(state.recChunks, {type: 'video/webm'});
+      const blob = new Blob(state.recChunks, {type: state.recMime});
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = 'vjfx-rec-' + Date.now() + '.webm';
+      a.download = 'vjfx-rec-' + Date.now() + '.' + state.recExt;
       a.click();
     };
+    state.recPrevLoop = state.comp.loop;
+    state.comp.loop = false;
+    setTimelineTime(state.comp.inPoint);
+    state.play.playing = true;
+    state.play.lastWall = performance.now() / 1000;
+    syncTimelineControls();
     state.recorder.start(250);
     state.recording = true;
     state.recStartTime = performance.now();
@@ -2304,6 +2326,8 @@ function stopRec() {
     state.recorder.stop();
   }
   state.recording = false;
+  state.comp.loop = state.recPrevLoop;
+  syncTimelineControls();
   recBtn.innerHTML = '● 録画';
   recBtn.classList.remove('danger');
   recInfo.textContent = 'stop';
@@ -2311,7 +2335,9 @@ function stopRec() {
 function updateRecInfo() {
   if (!state.recording) return;
   const sec = (performance.now() - state.recStartTime) / 1000;
-  recInfo.innerHTML = `<span class="recRing"></span>REC ${sec.toFixed(1)}s`;
+  const len = Math.max(0.001, state.comp.outPoint - state.comp.inPoint);
+  const p = clamp((state.play.time - state.comp.inPoint) / len, 0, 1);
+  recInfo.innerHTML = `<span class="recRing"></span>REC ${sec.toFixed(1)}s ${state.recExt.toUpperCase()}<span class="recProgress"><span style="width:${(p * 100).toFixed(1)}%"></span></span>`;
   setTimeout(updateRecInfo, 200);
 }
 document.getElementById('snapBtn').addEventListener('click', () => {
