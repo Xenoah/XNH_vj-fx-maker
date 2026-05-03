@@ -30,11 +30,13 @@ button:active { background: #303641; }
 button.primary { background: #2c3554; border-color: #4a5b8a; }
 button.primary:hover { background: #34406b; }
 button.danger { background: #4a2c2c; border-color: #8a4a4a; }
+button.toggle-on { background: #253a30; border-color: #3f7c58; color: #b8f0c8; }
 input[type=text], input[type=number] { background: #101218; border: 1px solid var(--line); padding: 3px 6px; border-radius: 3px; color: var(--text); }
 input[type=number] { width: 68px; }
 input[type=range] { width: 100%; accent-color: var(--accent); }
 input[type=color] { width: 28px; height: 22px; padding: 0; border: 1px solid var(--line); background: #101218; cursor: pointer; }
 input[type=file] { font-size: 11px; max-width: 100%; }
+select { background: #101218; border: 1px solid var(--line); padding: 3px 6px; border-radius: 3px; }
 
 #app {
   display: grid;
@@ -59,6 +61,7 @@ input[type=file] { font-size: 11px; max-width: 100%; }
 .brand { font-weight: 700; letter-spacing: .02em; color: #f2f3f5; flex: 0 0 auto; }
 .top-group { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .top-group.grow { flex: 1 1 auto; }
+.top-group.transport button { min-width: 48px; }
 .top-label { color: var(--muted); font-size: 10px; text-transform: uppercase; }
 #timecode { font: 12px/1.2 ui-monospace, Consolas, monospace; color: #cbd3e2; min-width: 66px; text-align: right; }
 #topbar input[type=range] { width: 90px; }
@@ -122,18 +125,27 @@ canvas#view { display: block; max-width: 100%; max-height: 100%; background: #00
 .fx-body .row label { flex-basis: 82px; }
 .empty { color: var(--muted); font-size: 11px; padding: 10px; border: 1px dashed #323743; border-radius: 4px; background: #111318; }
 
-.timeline-ruler { position: relative; height: 28px; border-bottom: 1px solid var(--line-soft); background: #111318; overflow: hidden; }
+.timeline-controls { display: flex; align-items: center; gap: 10px; padding: 5px 10px; border-bottom: 1px solid var(--line-soft); background: #13161c; min-height: 34px; overflow-x: auto; }
+.timeline-controls label { display: flex; align-items: center; gap: 5px; color: #b5bbc8; white-space: nowrap; }
+.timeline-controls input[type=number] { width: 62px; }
+.timeline-ruler { position: relative; height: 28px; border-bottom: 1px solid var(--line-soft); background: #111318; overflow: hidden; cursor: ew-resize; flex: 0 0 28px; }
 .timeline-ruler::before {
   content: ""; position: absolute; inset: 0;
   background: repeating-linear-gradient(to right, #313640 0 1px, transparent 1px 80px),
               repeating-linear-gradient(to right, #222730 0 1px, transparent 1px 20px);
 }
-.playhead { position: absolute; top: 0; bottom: 0; left: 0; width: 2px; background: #d6d9df; box-shadow: 0 0 0 1px #0006; }
+.ruler-tick { position: absolute; top: 0; bottom: 0; border-left: 1px solid #343a46; color: #707887; font: 10px/1 ui-monospace, Consolas, monospace; }
+.ruler-tick.major { border-left-color: #566070; color: #aeb6c5; }
+.ruler-tick span { position: absolute; top: 4px; left: 4px; white-space: nowrap; }
+.loop-range { position: absolute; top: 0; bottom: 0; background: #6a86d81c; border-left: 1px solid #6a86d877; border-right: 1px solid #6a86d877; pointer-events: none; z-index: 1; }
+.inout-marker { position: absolute; top: 0; bottom: 0; width: 1px; background: #d8c188; pointer-events: none; z-index: 2; }
+.inout-marker::after { content: attr(data-label); position: absolute; top: 14px; left: 3px; color: #d8c188; font: 9px/1 ui-monospace, Consolas, monospace; }
+.playhead { position: absolute; top: 0; bottom: 0; left: 0; width: 2px; background: #d6d9df; box-shadow: 0 0 0 1px #0006; pointer-events: none; z-index: 4; }
 #timelineList { overflow: auto; min-height: 0; flex: 1; padding: 4px 6px 8px; }
 .lane-row { height: 26px; margin-bottom: 3px; padding: 0 6px; }
 .lane-row .mvbtn { padding: 1px 5px; font-size: 10px; line-height: 1.1; }
 .lane-track { position: relative; flex: 0 0 42%; height: 12px; background: #101318; border: 1px solid #242935; border-radius: 2px; overflow: hidden; }
-.lane-bar { position: absolute; inset: 1px; border-radius: 1px; background: linear-gradient(90deg, #4c6fb7, #a56a5f); opacity: .9; }
+.lane-bar { position: absolute; top: 1px; bottom: 1px; border-radius: 1px; background: linear-gradient(90deg, #4c6fb7, #a56a5f); opacity: .9; }
 .lane-row:not(.on) .lane-bar { display: none; }
 
 .recRing { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #d44; margin-right: 4px; vertical-align: middle; animation: blink 1s infinite; }
@@ -149,6 +161,11 @@ hr { border: 0; border-top: 1px solid var(--line-soft); margin: 8px 0; }
 
 <header id="topbar">
   <div class="brand">VJ FX Maker</div>
+  <div class="top-group transport">
+    <button id="rewindBtn">先頭</button>
+    <button id="playBtn">停止</button>
+    <button id="loopBtn" class="toggle-on">Loop</button>
+  </div>
   <div class="top-group">
     <span class="top-label">BPM</span>
     <input type="number" id="bpmInput" min="20" max="300" step="0.5" value="120">
@@ -249,6 +266,25 @@ hr { border: 0; border-top: 1px solid var(--line-soft); margin: 8px 0; }
     <div class="panel-title">Timeline</div>
     <div id="timelineSummary"></div>
     <div id="recInfo" style="color:#888f9d; font-size:11px;">stop</div>
+  </div>
+  <div class="timeline-controls">
+    <label>duration <input type="number" id="durationInput" min="4" max="60" step="1" value="8"></label>
+    <label>mode
+      <select id="timeModeSelect">
+        <option value="sec">sec</option>
+        <option value="beat">beat</option>
+      </select>
+    </label>
+    <label>snap
+      <select id="snapSelect">
+        <option value="none">off</option>
+        <option value="beat">1拍</option>
+        <option value="half">半拍</option>
+        <option value="eighth">8分</option>
+      </select>
+    </label>
+    <label>In <input type="number" id="inPointInput" min="0" max="60" step="0.01" value="0"></label>
+    <label>Out <input type="number" id="outPointInput" min="0" max="60" step="0.01" value="8"></label>
   </div>
   <div class="timeline-ruler"><div class="playhead" id="playhead"></div></div>
   <div id="timelineList"></div>
@@ -932,8 +968,9 @@ const state = {
   layers: [],
   nextLayerSeq: 1,
   bpm: 120,
-  beatStart: performance.now() / 1000,
   beatPhase: 0,
+  comp: { duration: 8, timeMode: 'sec', inPoint: 0, outPoint: 8, loop: true, snap: 'none' },
+  play: { playing: true, time: 0, lastWall: performance.now() / 1000 },
   audio: { ctx: null, analyser: null, level: 0, gain: 2, source: null, kind: null },
   resScale: 1,
   selectedLayerId: null,
@@ -1073,7 +1110,7 @@ function drawDemo(t) {
   demoCtx.fillText('DEMO', w/2, h/2 + 20);
 }
 
-function uploadSource() {
+function uploadSource(t) {
   const s = state.source;
   try {
     if (s.kind === 'image' && s.image && s.image.complete && s.image.naturalWidth) {
@@ -1088,7 +1125,7 @@ function uploadSource() {
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, s.media);
     } else {
-      drawDemo(performance.now() / 1000);
+      drawDemo(t);
       gl.bindTexture(gl.TEXTURE_2D, srcTex);
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, demoCanvas);
@@ -1128,7 +1165,6 @@ function drawQuad() {
 }
 
 let frameCount = 0, lastFps = performance.now(), curFps = 0;
-let startTime = performance.now() / 1000;
 
 function effectiveAmount(layer) {
   const v = layer.values;
@@ -1138,14 +1174,61 @@ function effectiveAmount(layer) {
   return Math.max(0, Math.min(1.5, amt));
 }
 
+function formatTime(t) {
+  const safe = Math.max(0, t);
+  const minutes = Math.floor(safe / 60);
+  const seconds = safe % 60;
+  return `${String(minutes).padStart(2,'0')}:${seconds.toFixed(1).padStart(4,'0')}`;
+}
+
+function beatDuration() {
+  return 60 / Math.max(1, state.bpm);
+}
+
+function snapTime(t) {
+  const mode = state.comp.snap;
+  if (mode === 'none') return t;
+  const beat = beatDuration();
+  const step = mode === 'beat' ? beat : mode === 'half' ? beat / 2 : beat / 4;
+  return Math.round(t / step) * step;
+}
+
+function setTimelineTime(t, opts = {}) {
+  const next = opts.snap ? snapTime(t) : t;
+  state.play.time = clamp(next, 0, state.comp.duration);
+  updateTimelineVisuals();
+}
+
+function advancePlayback(now) {
+  if (!state.play.playing) {
+    state.play.lastWall = now;
+    return;
+  }
+  const dt = Math.max(0, Math.min(0.25, now - state.play.lastWall));
+  state.play.lastWall = now;
+  let next = state.play.time + dt;
+  if (next < state.comp.inPoint) next = state.comp.inPoint;
+  if (next >= state.comp.outPoint) {
+    if (state.comp.loop && state.comp.outPoint > state.comp.inPoint) {
+      const len = state.comp.outPoint - state.comp.inPoint;
+      next = state.comp.inPoint + ((next - state.comp.inPoint) % len);
+    } else {
+      next = state.comp.outPoint;
+      state.play.playing = false;
+      updateTransportButtons();
+    }
+  }
+  setTimelineTime(next);
+}
+
 function render() {
   const now = performance.now() / 1000;
-  const t = now - startTime;
-  // BPM phase
-  state.beatPhase = ((now - state.beatStart) * (state.bpm / 60)) % 1;
+  advancePlayback(now);
+  const t = state.play.time;
+  state.beatPhase = ((t * state.bpm / 60) % 1 + 1) % 1;
 
   // upload source
-  uploadSource();
+  uploadSource(t);
 
   // pipeline
   const enabled = state.layers.filter(layer => layer.enabled);
@@ -1245,11 +1328,8 @@ function render() {
     `<span class="k">audio</span> <span class="v">${state.audio.level.toFixed(2)}</span>`;
   document.getElementById('beatBar').value = state.beatPhase;
   document.getElementById('audioBar').value = Math.min(1, state.audio.level);
-  const minutes = Math.floor(t / 60);
-  const seconds = t % 60;
-  document.getElementById('timecode').textContent =
-    `${String(minutes).padStart(2,'0')}:${seconds.toFixed(1).padStart(4,'0')}`;
-  document.getElementById('playhead').style.left = (state.beatPhase * 100).toFixed(2) + '%';
+  document.getElementById('timecode').textContent = formatTime(t);
+  updateTimelineVisuals();
 
   requestAnimationFrame(render);
 }
@@ -1312,7 +1392,7 @@ document.getElementById('playPause').addEventListener('click', () => {
 const bpmInput = document.getElementById('bpmInput');
 bpmInput.addEventListener('input', () => {
   state.bpm = parseFloat(bpmInput.value) || 120;
-  state.beatStart = performance.now() / 1000;
+  rebuildTimelineRuler();
 });
 let tapTimes = [];
 document.getElementById('tapBpm').addEventListener('click', () => {
@@ -1326,10 +1406,178 @@ document.getElementById('tapBpm').addEventListener('click', () => {
     if (avg < 2000) {
       state.bpm = Math.max(20, Math.min(300, 60000 / avg));
       bpmInput.value = state.bpm.toFixed(1);
-      state.beatStart = now / 1000;
+      rebuildTimelineRuler();
     }
   }
   setTimeout(() => { if (performance.now() - now > 1500) tapTimes = []; }, 1600);
+});
+
+// ===================================================================
+// TIMELINE
+// ===================================================================
+const playBtn = document.getElementById('playBtn');
+const rewindBtn = document.getElementById('rewindBtn');
+const loopBtn = document.getElementById('loopBtn');
+const durationInput = document.getElementById('durationInput');
+const timeModeSelect = document.getElementById('timeModeSelect');
+const snapSelect = document.getElementById('snapSelect');
+const inPointInput = document.getElementById('inPointInput');
+const outPointInput = document.getElementById('outPointInput');
+const timelineRuler = document.querySelector('.timeline-ruler');
+const playhead = document.getElementById('playhead');
+let loopRangeEl = null;
+let inMarkerEl = null;
+let outMarkerEl = null;
+
+function updateTransportButtons() {
+  playBtn.textContent = state.play.playing ? '停止' : '再生';
+  loopBtn.classList.toggle('toggle-on', state.comp.loop);
+}
+
+function syncTimelineControls() {
+  durationInput.value = state.comp.duration.toFixed(0);
+  timeModeSelect.value = state.comp.timeMode;
+  snapSelect.value = state.comp.snap;
+  inPointInput.max = state.comp.duration;
+  outPointInput.max = state.comp.duration;
+  inPointInput.value = state.comp.inPoint.toFixed(2);
+  outPointInput.value = state.comp.outPoint.toFixed(2);
+  updateTransportButtons();
+}
+
+function rebuildTimelineRuler() {
+  timelineRuler.querySelectorAll('.ruler-tick,.loop-range,.inout-marker').forEach(el => el.remove());
+  loopRangeEl = document.createElement('div');
+  loopRangeEl.className = 'loop-range';
+  inMarkerEl = document.createElement('div');
+  inMarkerEl.className = 'inout-marker';
+  inMarkerEl.dataset.label = 'I';
+  outMarkerEl = document.createElement('div');
+  outMarkerEl.className = 'inout-marker';
+  outMarkerEl.dataset.label = 'O';
+  timelineRuler.insertBefore(loopRangeEl, playhead);
+  timelineRuler.insertBefore(inMarkerEl, playhead);
+  timelineRuler.insertBefore(outMarkerEl, playhead);
+
+  const duration = state.comp.duration;
+  if (state.comp.timeMode === 'beat') {
+    const beat = beatDuration();
+    const totalBeats = Math.ceil(duration / beat);
+    for (let i = 0; i <= totalBeats; i++) {
+      const t = Math.min(duration, i * beat);
+      addRulerTick(t, i % 4 === 0, i % 4 === 0 ? String(i + 1) : '');
+    }
+  } else {
+    const major = duration <= 12 ? 1 : duration <= 30 ? 2 : 5;
+    const minor = major / 4;
+    for (let t = 0; t <= duration + 0.0001; t += minor) {
+      const isMajor = Math.abs((t / major) - Math.round(t / major)) < 0.001;
+      addRulerTick(Math.min(duration, t), isMajor, isMajor ? `${Math.round(t)}s` : '');
+    }
+  }
+  updateTimelineVisuals();
+}
+
+function addRulerTick(t, major, label) {
+  const tick = document.createElement('div');
+  tick.className = 'ruler-tick' + (major ? ' major' : '');
+  tick.style.left = (t / state.comp.duration * 100).toFixed(3) + '%';
+  if (label) tick.innerHTML = `<span>${label}</span>`;
+  timelineRuler.insertBefore(tick, playhead);
+}
+
+function updateTimelineVisuals() {
+  const duration = Math.max(0.001, state.comp.duration);
+  playhead.style.left = (state.play.time / duration * 100).toFixed(3) + '%';
+  if (loopRangeEl) {
+    const left = state.comp.inPoint / duration * 100;
+    const right = state.comp.outPoint / duration * 100;
+    loopRangeEl.style.left = left.toFixed(3) + '%';
+    loopRangeEl.style.width = Math.max(0, right - left).toFixed(3) + '%';
+  }
+  if (inMarkerEl) inMarkerEl.style.left = (state.comp.inPoint / duration * 100).toFixed(3) + '%';
+  if (outMarkerEl) outMarkerEl.style.left = (state.comp.outPoint / duration * 100).toFixed(3) + '%';
+}
+
+function setDuration(v) {
+  const duration = clamp(parseFloat(v) || state.comp.duration, 4, 60);
+  state.comp.duration = duration;
+  state.comp.inPoint = clamp(state.comp.inPoint, 0, duration - 1 / 60);
+  state.comp.outPoint = clamp(state.comp.outPoint, state.comp.inPoint + 1 / 60, duration);
+  setTimelineTime(state.play.time);
+  syncTimelineControls();
+  rebuildTimelineRuler();
+  refreshFxUI();
+}
+
+function setInPoint(v) {
+  const minGap = 1 / 60;
+  state.comp.inPoint = clamp(parseFloat(v) || 0, 0, state.comp.duration - minGap);
+  if (state.comp.outPoint <= state.comp.inPoint + minGap) {
+    state.comp.outPoint = clamp(state.comp.inPoint + minGap, minGap, state.comp.duration);
+  }
+  syncTimelineControls();
+  rebuildTimelineRuler();
+  refreshFxUI();
+}
+
+function setOutPoint(v) {
+  const minGap = 1 / 60;
+  state.comp.outPoint = clamp(parseFloat(v) || state.comp.duration, state.comp.inPoint + minGap, state.comp.duration);
+  syncTimelineControls();
+  rebuildTimelineRuler();
+  refreshFxUI();
+}
+
+function togglePlayback() {
+  if (!state.play.playing && (state.play.time >= state.comp.outPoint || state.play.time < state.comp.inPoint)) {
+    setTimelineTime(state.comp.inPoint);
+  }
+  state.play.playing = !state.play.playing;
+  state.play.lastWall = performance.now() / 1000;
+  updateTransportButtons();
+}
+
+function timeFromRulerEvent(e) {
+  const rect = timelineRuler.getBoundingClientRect();
+  const x = clamp(e.clientX - rect.left, 0, rect.width);
+  return x / Math.max(1, rect.width) * state.comp.duration;
+}
+
+playBtn.addEventListener('click', togglePlayback);
+rewindBtn.addEventListener('click', () => setTimelineTime(0));
+loopBtn.addEventListener('click', () => {
+  state.comp.loop = !state.comp.loop;
+  updateTransportButtons();
+});
+durationInput.addEventListener('change', e => setDuration(e.target.value));
+timeModeSelect.addEventListener('change', e => {
+  state.comp.timeMode = e.target.value;
+  syncTimelineControls();
+  rebuildTimelineRuler();
+});
+snapSelect.addEventListener('change', e => {
+  state.comp.snap = e.target.value;
+  syncTimelineControls();
+});
+inPointInput.addEventListener('change', e => setInPoint(e.target.value));
+outPointInput.addEventListener('change', e => setOutPoint(e.target.value));
+
+let rulerDragging = false;
+timelineRuler.addEventListener('pointerdown', e => {
+  if (e.button !== 0) return;
+  rulerDragging = true;
+  timelineRuler.setPointerCapture(e.pointerId);
+  state.play.playing = false;
+  setTimelineTime(timeFromRulerEvent(e), {snap:true});
+  updateTransportButtons();
+});
+timelineRuler.addEventListener('pointermove', e => {
+  if (rulerDragging) setTimelineTime(timeFromRulerEvent(e), {snap:true});
+});
+timelineRuler.addEventListener('pointerup', e => {
+  rulerDragging = false;
+  try { timelineRuler.releasePointerCapture(e.pointerId); } catch (err) {}
 });
 
 // ===================================================================
@@ -1587,6 +1835,8 @@ function buildTimeline() {
   state.layers.forEach((layer, idx) => {
     const def = effectDef(layer.effId);
     if (!def) return;
+    const inPct = state.comp.inPoint / state.comp.duration * 100;
+    const outPct = state.comp.outPoint / state.comp.duration * 100;
     const row = document.createElement('div');
     row.className = 'lane-row' +
       (layer.enabled ? ' on' : '') +
@@ -1597,7 +1847,7 @@ function buildTimeline() {
       <span class="lane-name">${def.name}</span>
       <button class="mvbtn" data-act="up">▲</button>
       <button class="mvbtn" data-act="down">▼</button>
-      <div class="lane-track"><div class="lane-bar"></div></div>
+      <div class="lane-track"><div class="lane-bar" style="left:${inPct.toFixed(3)}%;width:${Math.max(0, outPct - inPct).toFixed(3)}%;"></div></div>
     `;
     row.addEventListener('click', () => selectLayer(layer.lid));
     const chk = row.querySelector('input');
@@ -1860,10 +2110,45 @@ document.getElementById('hidePanelBtn').addEventListener('click', () => {
 });
 document.addEventListener('fullscreenchange', () => setTimeout(resizeCanvas, 50));
 document.addEventListener('keydown', e => {
-  if (e.key === 'f' && !e.target.matches('input,textarea')) {
+  if (e.target.matches('input,textarea,select')) return;
+  if (e.code === 'Space') {
+    e.preventDefault();
+    togglePlayback();
+  }
+  if (e.key === 'ArrowLeft') {
+    e.preventDefault();
+    state.play.playing = false;
+    setTimelineTime(state.play.time - 1 / 60);
+    updateTransportButtons();
+  }
+  if (e.key === 'ArrowRight') {
+    e.preventDefault();
+    state.play.playing = false;
+    setTimelineTime(state.play.time + 1 / 60);
+    updateTransportButtons();
+  }
+  if (e.key === 'Home') {
+    e.preventDefault();
+    state.play.playing = false;
+    setTimelineTime(0);
+    updateTransportButtons();
+  }
+  if (e.key === 'End') {
+    e.preventDefault();
+    state.play.playing = false;
+    setTimelineTime(state.comp.duration);
+    updateTransportButtons();
+  }
+  if (e.key.toLowerCase() === 'i') {
+    setInPoint(state.play.time);
+  }
+  if (e.key.toLowerCase() === 'o') {
+    setOutPoint(state.play.time);
+  }
+  if (e.key === 'f') {
     document.getElementById('fsBtn').click();
   }
-  if (e.key === 'h' && !e.target.matches('input,textarea')) {
+  if (e.key === 'h') {
     document.getElementById('hidePanelBtn').click();
   }
 });
@@ -1937,6 +2222,8 @@ function setupPanelResize() {
 // INIT
 // ===================================================================
 applyPanelSizes();
+syncTimelineControls();
+rebuildTimelineRuler();
 setupPanelResize();
 refreshFxUI();
 resizeCanvas();
