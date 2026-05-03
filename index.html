@@ -1,0 +1,1624 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VJ FX Maker</title>
+<style>
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; background: #0e0f12; color: #e7e8ea;
+  font: 12px/1.4 system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Yu Gothic", sans-serif;
+  overflow: hidden; }
+button, input, select { font: inherit; color: inherit; }
+button { background: #1c1f25; border: 1px solid #2a2e36; padding: 5px 9px; border-radius: 4px; cursor: pointer; transition: background .1s; }
+button:hover { background: #262b34; }
+button:active { background: #2e333d; }
+button.primary { background: #2c3554; border-color: #4a5b8a; }
+button.primary:hover { background: #34406b; }
+button.danger { background: #4a2c2c; border-color: #8a4a4a; }
+input[type=text], input[type=number] { background: #14161b; border: 1px solid #2a2e36; padding: 3px 6px; border-radius: 3px; color: #e7e8ea; }
+input[type=number] { width: 64px; }
+input[type=range] { width: 100%; accent-color: #6a86d8; }
+input[type=color] { width: 28px; height: 22px; padding: 0; border: 1px solid #2a2e36; background: #14161b; cursor: pointer; }
+input[type=file] { font-size: 11px; max-width: 100%; }
+
+#app { display: grid; grid-template-columns: 240px 1fr 320px; height: 100vh; }
+#app.fs #left, #app.fs #right { display: none; }
+#app.fs { grid-template-columns: 1fr; }
+
+#left, #right { background: #15171c; padding: 10px; overflow-y: auto; }
+#left { border-right: 1px solid #23262d; }
+#right { border-left: 1px solid #23262d; }
+#center { display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: #07080a; position: relative; min-width: 0; min-height: 0; padding: 8px; }
+#viewWrap { position: relative; max-width: 100%; max-height: 100%; display: flex; align-items: center; justify-content: center; }
+canvas#view { display: block; max-width: 100%; max-height: calc(100vh - 16px); background: #000;
+  box-shadow: 0 0 0 1px #23262d, 0 8px 30px #0008; }
+#hud { position: absolute; bottom: 8px; left: 12px; font: 10px/1.3 ui-monospace, Consolas, monospace; color: #6a7180; pointer-events: none; text-shadow: 0 0 3px #000; }
+#hud .k { color: #9ab; }
+#hud .v { color: #cde; }
+
+.section { margin-bottom: 14px; }
+.section h3 { margin: 4px 0 6px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: #8a92a3; font-weight: 600; }
+.row { display: flex; gap: 6px; align-items: center; margin: 3px 0; }
+.row label { flex: 0 0 60px; font-size: 11px; color: #b5bbc8; }
+.row .v { color: #888f9d; font-variant-numeric: tabular-nums; min-width: 36px; text-align: right; font-size: 10px; }
+
+.toolbar { display: flex; gap: 4px; flex-wrap: wrap; }
+.toolbar button { padding: 4px 8px; font-size: 11px; }
+
+#fxStatus { font-size: 10px; color: #888f9d; margin-bottom: 6px; line-height: 1.5; }
+
+.fx { background: #181b21; border: 1px solid #23262d; border-radius: 4px; margin-bottom: 5px; }
+.fx.on { border-color: #4a5b8a; box-shadow: 0 0 0 1px #2c3554 inset; }
+.fx-head { display: flex; align-items: center; gap: 5px; padding: 5px 7px; user-select: none; }
+.fx-head .num { width: 22px; color: #6a7180; font-variant-numeric: tabular-nums; font-size: 10px; flex: 0 0 auto; }
+.fx-head .name { flex: 1; font-size: 12px; cursor: pointer; }
+.fx-head input[type=checkbox] { margin: 0; flex: 0 0 auto; }
+.fx-head .mvbtn { padding: 1px 5px; font-size: 10px; line-height: 1; }
+.badge { font-size: 9px; padding: 1px 5px; border-radius: 8px; background: #2a2e36; color: #b5bbc8; flex: 0 0 auto; }
+.badge.full { background: #1f3d2a; color: #88d8a3; }
+.badge.lite { background: #3d352a; color: #d8c188; }
+.badge.mon  { background: #2a3a4d; color: #88b3d8; }
+.fx-body { display: none; padding: 6px 8px 8px; border-top: 1px solid #23262d; }
+.fx.open .fx-body { display: block; }
+.fx-body .row label { flex-basis: 70px; }
+
+.recRing { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #d44; margin-right: 4px; vertical-align: middle; animation: blink 1s infinite; }
+@keyframes blink { 50% { opacity: 0.3; } }
+
+#fpsInfo { font-family: ui-monospace, Consolas, monospace; }
+.note { font-size: 10px; color: #6a7180; margin-top: 4px; line-height: 1.4; }
+hr { border: 0; border-top: 1px solid #23262d; margin: 8px 0; }
+</style>
+</head>
+<body>
+<div id="app">
+
+<aside id="left">
+  <div class="section">
+    <h3>素材</h3>
+    <input type="file" id="fileInput" accept="image/*,video/*">
+    <div class="row" style="margin-top:6px;">
+      <button id="useDemo">デモ映像</button>
+      <button id="playPause">再生/停止</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>解像度</h3>
+    <div class="row">
+      <label>scale</label>
+      <input type="range" id="resScale" min="0.25" max="1" step="0.05" value="1">
+      <span class="v" id="resScaleV">1.00</span>
+    </div>
+    <div class="note">重い場合は下げる</div>
+  </div>
+
+  <div class="section">
+    <h3>BPM</h3>
+    <div class="row">
+      <label>BPM</label>
+      <input type="number" id="bpmInput" min="20" max="300" step="0.5" value="120">
+      <button id="tapBpm">tap</button>
+    </div>
+    <div class="row">
+      <label>位相</label>
+      <input type="range" id="beatBar" min="0" max="1" step="0.001" value="0" disabled>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>音声</h3>
+    <div class="toolbar">
+      <button id="micBtn">マイク</button>
+    </div>
+    <input type="file" id="audioFile" accept="audio/*" style="margin-top:6px;">
+    <div class="row">
+      <label>level</label>
+      <input type="range" id="audioBar" min="0" max="1" step="0.001" value="0" disabled>
+    </div>
+    <div class="row">
+      <label>感度</label>
+      <input type="range" id="audioGain" min="0.5" max="6" step="0.1" value="2">
+      <span class="v" id="audioGainV">2.0</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>プリセット</h3>
+    <div class="toolbar">
+      <button id="presetSave">保存</button>
+      <button id="presetLoad">読込</button>
+      <button id="presetRand" class="primary">ランダム</button>
+      <button id="presetClear">クリア</button>
+    </div>
+    <input type="file" id="presetFile" accept="application/json" style="display:none;">
+  </div>
+
+  <div class="section">
+    <h3>録画 / 出力</h3>
+    <div class="toolbar">
+      <button id="recBtn">● 録画</button>
+      <button id="snapBtn">PNG</button>
+    </div>
+    <div id="recInfo" style="margin-top:5px; color:#888f9d; font-size:11px;">stop</div>
+  </div>
+
+  <div class="section">
+    <h3>表示</h3>
+    <div class="toolbar">
+      <button id="fsBtn">全画面</button>
+      <button id="hidePanelBtn">パネル隠す</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>情報</h3>
+    <div id="fpsInfo">FPS -</div>
+  </div>
+</aside>
+
+<main id="center">
+  <div id="viewWrap"><canvas id="view" width="1280" height="720"></canvas></div>
+  <div id="hud"></div>
+</main>
+
+<aside id="right">
+  <div id="fxStatus"></div>
+  <div class="toolbar" style="margin-bottom:8px;">
+    <button id="fxAllOff">全OFF</button>
+    <button id="fxExpandAll">全展開</button>
+    <button id="fxCollapseAll">全折畳</button>
+  </div>
+  <div id="effectList"></div>
+</aside>
+
+</div>
+
+<script>
+'use strict';
+(function(){
+
+// ===================================================================
+// SHADER LIBRARY HEADER (prepended to every effect frag)
+// ===================================================================
+const SHADER_HEADER = `
+precision highp float;
+varying vec2 v_uv;
+uniform sampler2D u_tex;
+uniform sampler2D u_prev;
+uniform vec2 u_res;
+uniform float u_time;
+uniform float u_beat;
+uniform float u_audio;
+uniform float u_amount;
+uniform float u_speed;
+uniform float u_mix;
+uniform float u_p1;
+uniform float u_p2;
+uniform float u_p3;
+uniform float u_p4;
+uniform vec3 u_colorA;
+uniform vec3 u_colorB;
+
+vec3 rgb2hsv(vec3 c){
+  vec4 K = vec4(0.0, -1.0/3.0, 2.0/3.0, -1.0);
+  vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+  vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+  float d = q.x - min(q.w, q.y);
+  float e = 1.0e-10;
+  return vec3(abs(q.z + (q.w - q.y) / (6.0*d + e)), d / (q.x + e), q.x);
+}
+vec3 hsv2rgb(vec3 c){
+  vec4 K = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
+  vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+  return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+float hash11(float p){ return fract(sin(p*78.233)*43758.5453); }
+float hash12(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)))*43758.5453); }
+float vnoise(vec2 p){
+  vec2 i = floor(p), f = fract(p);
+  float a = hash12(i), b = hash12(i+vec2(1,0)),
+        c = hash12(i+vec2(0,1)), d = hash12(i+vec2(1,1));
+  vec2 u = f*f*(3.0-2.0*f);
+  return mix(a,b,u.x) + (c-a)*u.y*(1.0-u.x) + (d-b)*u.x*u.y;
+}
+vec4 sampleEdge(vec2 uv){ return texture2D(u_tex, clamp(uv, 0.001, 0.999)); }
+`;
+
+const VERT = `
+attribute vec2 a_pos;
+varying vec2 v_uv;
+void main(){
+  v_uv = a_pos * 0.5 + 0.5;
+  gl_Position = vec4(a_pos, 0.0, 1.0);
+}`;
+
+const COPY_FRAG = `
+precision highp float;
+varying vec2 v_uv;
+uniform sampler2D u_tex;
+void main(){ gl_FragColor = texture2D(u_tex, v_uv); }`;
+
+// ===================================================================
+// EFFECT DEFINITIONS (50 entries)
+// ===================================================================
+// st: 'full' = full WebGL, 'lite' = simplified, 'mon' = monitor only
+// extras: [{key,label,min,max,def,type}] map to u_p1..u_p4 (4 max)
+// defaults: { amount, speed, mix, bpmSync, audioReactive, ...extras }
+// ===================================================================
+
+const EFFECTS = [
+// 1
+{id:'zoom', name:'01 ズーム', st:'full',
+ def:{amount:0.3, mix:1},
+ frag:`
+  float s = 1.0 + (u_amount-0.5) * 4.0;
+  vec2 uv = (v_uv - vec2(0.5+(u_p1-0.5)*0.5, 0.5+(u_p2-0.5)*0.5)) / s + 0.5;
+  gl_FragColor = mix(texture2D(u_tex,v_uv), sampleEdge(uv), u_mix);`,
+ extras:[
+   {key:'cx',label:'centerX',min:0,max:1,def:0.5},
+   {key:'cy',label:'centerY',min:0,max:1,def:0.5}
+ ]},
+// 2
+{id:'pan', name:'02 パン', st:'full',
+ def:{amount:0.3, speed:0.3, mix:1},
+ frag:`
+  vec2 dir = vec2((u_p1-0.5)*2.0, (u_p2-0.5)*2.0);
+  vec2 uv = v_uv - dir * u_amount + dir * u_time * u_speed * 0.2;
+  uv = fract(uv);
+  gl_FragColor = mix(texture2D(u_tex,v_uv), texture2D(u_tex, uv), u_mix);`,
+ extras:[
+   {key:'dx',label:'dirX',min:0,max:1,def:0.7},
+   {key:'dy',label:'dirY',min:0,max:1,def:0.5}
+ ]},
+// 3
+{id:'crop', name:'03 クロップ', st:'full',
+ def:{amount:0.4, mix:1},
+ frag:`
+  vec2 c = (v_uv - 0.5) * (1.0 - u_amount*0.95) + 0.5;
+  gl_FragColor = mix(texture2D(u_tex,v_uv), texture2D(u_tex, c), u_mix);`,
+ extras:[]},
+// 4
+{id:'rotate', name:'04 回転', st:'full',
+ def:{amount:0.5, speed:0, mix:1},
+ frag:`
+  float a = (u_amount-0.5) * 6.2832 + u_time * u_speed * 2.0;
+  vec2 c = v_uv - 0.5;
+  mat2 R = mat2(cos(a), -sin(a), sin(a), cos(a));
+  vec2 uv = R * c + 0.5;
+  gl_FragColor = mix(texture2D(u_tex,v_uv), sampleEdge(uv), u_mix);`,
+ extras:[]},
+// 5
+{id:'mirror', name:'05 ミラー', st:'full',
+ def:{amount:1, mix:1},
+ frag:`
+  vec2 uv = v_uv;
+  if (u_p1 > 0.5) uv.x = uv.x < 0.5 ? uv.x : 1.0 - uv.x;
+  if (u_p2 > 0.5) uv.y = uv.y < 0.5 ? uv.y : 1.0 - uv.y;
+  gl_FragColor = mix(texture2D(u_tex,v_uv), texture2D(u_tex,uv), u_mix);`,
+ extras:[
+   {key:'mx',label:'X反転',min:0,max:1,def:1},
+   {key:'my',label:'Y反転',min:0,max:1,def:0}
+ ]},
+// 6
+{id:'tile', name:'06 タイル', st:'full',
+ def:{amount:0.4, mix:1},
+ frag:`
+  float n = floor(2.0 + u_amount * 14.0);
+  vec2 uv = fract(v_uv * n);
+  gl_FragColor = mix(texture2D(u_tex,v_uv), texture2D(u_tex,uv), u_mix);`,
+ extras:[]},
+// 7
+{id:'kaleido', name:'07 万華鏡', st:'full',
+ def:{amount:0.5, speed:0.2, mix:1},
+ frag:`
+  vec2 c = v_uv - 0.5;
+  float r = length(c);
+  float a = atan(c.y, c.x);
+  float n = floor(3.0 + u_amount * 10.0);
+  float seg = 6.2832 / n;
+  a = mod(a + u_time * u_speed * 0.6, seg);
+  a = abs(a - seg*0.5);
+  vec2 uv = vec2(cos(a), sin(a)) * r + 0.5;
+  gl_FragColor = mix(texture2D(u_tex,v_uv), sampleEdge(uv), u_mix);`,
+ extras:[]},
+// 8
+{id:'split', name:'08 スプリット', st:'full',
+ def:{amount:0.4, mix:1},
+ frag:`
+  float n = floor(2.0 + u_amount * 5.0);
+  vec2 uv = vec2(fract(v_uv.x * n), v_uv.y);
+  gl_FragColor = mix(texture2D(u_tex,v_uv), texture2D(u_tex,uv), u_mix);`,
+ extras:[]},
+// 9
+{id:'pip', name:'09 PiP', st:'full',
+ def:{amount:0.3, mix:1},
+ frag:`
+  vec4 base = texture2D(u_tex, v_uv);
+  float s = 0.1 + u_amount * 0.4;
+  vec2 box = (v_uv - vec2(u_p1, u_p2)) / s + 0.5;
+  vec4 col = base;
+  if (box.x > 0.0 && box.x < 1.0 && box.y > 0.0 && box.y < 1.0) {
+    col = mix(base, texture2D(u_tex, box), u_mix);
+    if (box.x < 0.01 || box.x > 0.99 || box.y < 0.01 || box.y > 0.99)
+      col = vec4(0.0, 0.0, 0.0, 1.0);
+  }
+  gl_FragColor = col;`,
+ extras:[
+   {key:'px',label:'posX',min:0,max:1,def:0.75},
+   {key:'py',label:'posY',min:0,max:1,def:0.75}
+ ]},
+// 10
+{id:'wrapscroll', name:'10 ラップスクロール', st:'full',
+ def:{amount:0.5, speed:0.5, mix:1},
+ frag:`
+  vec2 d = vec2((u_p1-0.5)*2.0, (u_p2-0.5)*2.0);
+  vec2 uv = fract(v_uv + d * u_time * u_speed * 0.5);
+  gl_FragColor = mix(texture2D(u_tex,v_uv), texture2D(u_tex, uv), u_mix);`,
+ extras:[
+   {key:'dx',label:'dirX',min:0,max:1,def:1},
+   {key:'dy',label:'dirY',min:0,max:1,def:0.5}
+ ]},
+// 11
+{id:'hue', name:'11 色相回転', st:'full',
+ def:{amount:0.5, speed:0, mix:1},
+ frag:`
+  vec4 c = texture2D(u_tex, v_uv);
+  vec3 h = rgb2hsv(c.rgb);
+  h.x = fract(h.x + (u_amount-0.5) + u_time*u_speed*0.2);
+  gl_FragColor = vec4(mix(c.rgb, hsv2rgb(h), u_mix), c.a);`,
+ extras:[]},
+// 12
+{id:'sat', name:'12 彩度', st:'full',
+ def:{amount:0.5, mix:1},
+ frag:`
+  vec4 c = texture2D(u_tex, v_uv);
+  float l = dot(c.rgb, vec3(0.299, 0.587, 0.114));
+  vec3 r = mix(vec3(l), c.rgb, u_amount * 2.0);
+  gl_FragColor = vec4(mix(c.rgb, r, u_mix), c.a);`,
+ extras:[]},
+// 13
+{id:'contrast', name:'13 コントラスト', st:'full',
+ def:{amount:0.5, mix:1},
+ frag:`
+  vec4 c = texture2D(u_tex, v_uv);
+  float k = (u_amount - 0.5) * 3.0 + 1.0;
+  vec3 r = (c.rgb - 0.5) * k + 0.5;
+  gl_FragColor = vec4(mix(c.rgb, r, u_mix), c.a);`,
+ extras:[]},
+// 14
+{id:'bright', name:'14 明るさ', st:'full',
+ def:{amount:0.5, mix:1},
+ frag:`
+  vec4 c = texture2D(u_tex, v_uv);
+  vec3 r = c.rgb + (u_amount - 0.5) * 1.5;
+  gl_FragColor = vec4(mix(c.rgb, clamp(r, 0.0, 1.5), u_mix), c.a);`,
+ extras:[]},
+// 15
+{id:'gamma', name:'15 ガンマ', st:'full',
+ def:{amount:0.5, mix:1},
+ frag:`
+  vec4 c = texture2D(u_tex, v_uv);
+  float g = u_amount < 0.5
+    ? mix(0.3, 1.0, u_amount * 2.0)
+    : mix(1.0, 3.0, (u_amount - 0.5) * 2.0);
+  vec3 r = pow(max(c.rgb, vec3(0.0)), vec3(1.0/g));
+  gl_FragColor = vec4(mix(c.rgb, r, u_mix), c.a);`,
+ extras:[]},
+// 16
+{id:'invert', name:'16 反転', st:'full',
+ def:{amount:1, mix:1},
+ frag:`
+  vec4 c = texture2D(u_tex, v_uv);
+  gl_FragColor = vec4(mix(c.rgb, 1.0 - c.rgb, u_amount * u_mix), c.a);`,
+ extras:[]},
+// 17
+{id:'mono', name:'17 モノクロ', st:'full',
+ def:{amount:1, mix:1},
+ frag:`
+  vec4 c = texture2D(u_tex, v_uv);
+  float l = dot(c.rgb, vec3(0.299, 0.587, 0.114));
+  gl_FragColor = vec4(mix(c.rgb, vec3(l), u_amount * u_mix), c.a);`,
+ extras:[]},
+// 18
+{id:'gradmap', name:'18 グラデーションマップ', st:'full',
+ def:{amount:0.7, mix:1},
+ frag:`
+  vec4 c = texture2D(u_tex, v_uv);
+  float l = dot(c.rgb, vec3(0.299, 0.587, 0.114));
+  vec3 g = mix(u_colorA, u_colorB, smoothstep(0.0, 1.0, l));
+  gl_FragColor = vec4(mix(c.rgb, g, u_amount * u_mix), c.a);`,
+ extras:[
+   {key:'cA',label:'colorA',min:0,max:1,def:'#1a0633',type:'color'},
+   {key:'cB',label:'colorB',min:0,max:1,def:'#ffaa44',type:'color'}
+ ]},
+// 19
+{id:'poster', name:'19 ポスタライズ', st:'full',
+ def:{amount:0.6, mix:1},
+ frag:`
+  vec4 c = texture2D(u_tex, v_uv);
+  float n = floor(2.0 + (1.0 - u_amount) * 14.0);
+  vec3 r = floor(c.rgb * n) / n;
+  gl_FragColor = vec4(mix(c.rgb, r, u_mix), c.a);`,
+ extras:[]},
+// 20
+{id:'lut', name:'20 LUT風', st:'lite',
+ def:{amount:0.6, mix:1},
+ frag:`
+  vec4 c = texture2D(u_tex, v_uv);
+  float l = dot(c.rgb, vec3(0.299, 0.587, 0.114));
+  vec3 sh = u_colorA;
+  vec3 hi = u_colorB;
+  vec3 tinted = c.rgb * mix(sh*2.0, hi*2.0, smoothstep(0.0, 1.0, l));
+  gl_FragColor = vec4(mix(c.rgb, clamp(tinted, 0.0, 2.0), u_amount * u_mix), c.a);`,
+ extras:[
+   {key:'cA',label:'シャドウ',min:0,max:1,def:'#3355aa',type:'color'},
+   {key:'cB',label:'ハイライト',min:0,max:1,def:'#ffcc88',type:'color'}
+ ]},
+// 21
+{id:'glow', name:'21 グロー', st:'full',
+ def:{amount:0.5, mix:1},
+ frag:`
+  vec4 c = texture2D(u_tex, v_uv);
+  vec3 acc = vec3(0.0);
+  float thr = 0.4;
+  float r = 2.0 + u_amount * 4.0;
+  for (int j = -3; j <= 3; j++) {
+    for (int i = -3; i <= 3; i++) {
+      vec2 o = vec2(float(i), float(j)) * r / u_res;
+      vec3 s = texture2D(u_tex, v_uv + o).rgb;
+      float l = max(max(s.r, s.g), s.b);
+      acc += s * smoothstep(thr, 1.0, l);
+    }
+  }
+  acc /= 49.0;
+  gl_FragColor = vec4(c.rgb + acc * u_amount * 5.0 * u_mix, c.a);`,
+ extras:[]},
+// 22
+{id:'edgeglow', name:'22 エッジグロウ', st:'full',
+ def:{amount:0.5, mix:1},
+ frag:`
+  vec4 c = texture2D(u_tex, v_uv);
+  vec2 px = 1.0 / u_res;
+  vec3 a = texture2D(u_tex, v_uv + vec2(px.x,0)).rgb;
+  vec3 b = texture2D(u_tex, v_uv - vec2(px.x,0)).rgb;
+  vec3 cc= texture2D(u_tex, v_uv + vec2(0,px.y)).rgb;
+  vec3 d = texture2D(u_tex, v_uv - vec2(0,px.y)).rgb;
+  vec3 e = abs(a-b) + abs(cc-d);
+  vec3 col = mix(c.rgb, c.rgb + e * 4.0, u_amount * u_mix);
+  gl_FragColor = vec4(col, c.a);`,
+ extras:[]},
+// 23
+{id:'bloom', name:'23 ブルーム', st:'lite',
+ def:{amount:0.5, mix:1},
+ frag:`
+  vec4 c = texture2D(u_tex, v_uv);
+  vec3 acc = vec3(0.0);
+  float r = 4.0 + u_amount * 8.0;
+  for (int j = -2; j <= 2; j++) {
+    for (int i = -2; i <= 2; i++) {
+      vec2 o = vec2(float(i), float(j)) * r / u_res;
+      vec3 s = texture2D(u_tex, v_uv + o).rgb;
+      float l = max(max(s.r, s.g), s.b);
+      acc += s * max(l - 0.5, 0.0) * 2.0;
+    }
+  }
+  acc /= 25.0;
+  gl_FragColor = vec4(c.rgb + acc * u_amount * 3.0 * u_mix, c.a);`,
+ extras:[]},
+// 24
+{id:'flare', name:'24 レンズフレア', st:'lite',
+ def:{amount:0.5, mix:1},
+ frag:`
+  vec4 c = texture2D(u_tex, v_uv);
+  vec2 fp = vec2(u_p1, u_p2);
+  vec2 d = v_uv - fp;
+  float ar = u_res.x / u_res.y;
+  d.x *= ar;
+  float core = exp(-length(d) * 6.0);
+  float halo = exp(-abs(length(d) - 0.25) * 25.0) * 0.5;
+  float ghost = 0.0;
+  for (int i = 1; i < 5; i++) {
+    vec2 g = mix(fp, vec2(0.5), float(i) * 0.25) - v_uv;
+    g.x *= ar;
+    ghost += exp(-length(g) * 30.0) * 0.4;
+  }
+  vec3 add = vec3(1.0, 0.85, 0.55) * (core + halo + ghost);
+  gl_FragColor = vec4(c.rgb + add * u_amount * 1.2 * u_mix, c.a);`,
+ extras:[
+   {key:'fx',label:'X',min:0,max:1,def:0.7},
+   {key:'fy',label:'Y',min:0,max:1,def:0.3}
+ ]},
+// 25
+{id:'leak', name:'25 ライトリーク', st:'lite',
+ def:{amount:0.5, speed:0.2, mix:1},
+ frag:`
+  vec4 c = texture2D(u_tex, v_uv);
+  float n1 = vnoise(v_uv * 2.0 + u_time * u_speed * 0.3);
+  float n2 = vnoise(v_uv * 4.0 - u_time * u_speed * 0.2 + 30.0);
+  float l = smoothstep(0.4, 0.9, n1*0.6 + n2*0.4);
+  vec3 add = u_colorA * l * u_amount * 1.5;
+  gl_FragColor = vec4(c.rgb + add * u_mix, c.a);`,
+ extras:[
+   {key:'cA',label:'tint',min:0,max:1,def:'#ffaa55',type:'color'}
+ ]},
+// 26
+{id:'vignette', name:'26 ビネット', st:'full',
+ def:{amount:0.6, mix:1},
+ frag:`
+  vec4 c = texture2D(u_tex, v_uv);
+  float d = length(v_uv - 0.5);
+  float v = smoothstep(0.85, 0.25, d * (1.0 + u_amount));
+  gl_FragColor = vec4(mix(c.rgb, c.rgb * v, u_mix), c.a);`,
+ extras:[]},
+// 27
+{id:'strobe', name:'27 ストロボ', st:'full',
+ def:{amount:0.7, speed:0.5, mix:1, bpmSync:1},
+ frag:`
+  vec4 c = texture2D(u_tex, v_uv);
+  float div = floor(1.0 + u_speed * 7.0);
+  float ph = fract(u_beat * div);
+  float dark = step(0.5, ph) * u_amount;
+  gl_FragColor = vec4(mix(c.rgb, c.rgb * (1.0 - dark), u_mix), c.a);`,
+ extras:[]},
+// 28
+{id:'flash', name:'28 フラッシュ', st:'full',
+ def:{amount:0.7, mix:1, bpmSync:1},
+ frag:`
+  vec4 c = texture2D(u_tex, v_uv);
+  float f = pow(1.0 - fract(u_beat), 5.0) * u_amount;
+  vec3 r = c.rgb + vec3(f);
+  gl_FragColor = vec4(mix(c.rgb, r, u_mix), c.a);`,
+ extras:[]},
+// 29
+{id:'gblur', name:'29 ガウスブラー', st:'full',
+ def:{amount:0.4, mix:1},
+ frag:`
+  vec4 acc = vec4(0.0);
+  float total = 0.0;
+  float r = 0.5 + u_amount * 6.0;
+  for (int j = -3; j <= 3; j++) {
+    for (int i = -3; i <= 3; i++) {
+      vec2 o = vec2(float(i), float(j)) * r / u_res;
+      float w = exp(-(float(i*i + j*j)) / 6.0);
+      acc += texture2D(u_tex, v_uv + o) * w;
+      total += w;
+    }
+  }
+  gl_FragColor = mix(texture2D(u_tex, v_uv), acc / total, u_mix);`,
+ extras:[]},
+// 30
+{id:'mblur', name:'30 モーションブラー', st:'full',
+ def:{amount:0.4, mix:1},
+ frag:`
+  float a = u_p1 * 6.2832;
+  vec2 dir = vec2(cos(a), sin(a)) * u_amount * 0.05;
+  vec4 acc = vec4(0.0);
+  for (int i = 0; i < 8; i++) {
+    float t = (float(i) - 3.5) / 8.0;
+    acc += texture2D(u_tex, v_uv + dir * t);
+  }
+  gl_FragColor = mix(texture2D(u_tex, v_uv), acc / 8.0, u_mix);`,
+ extras:[
+   {key:'ang',label:'angle',min:0,max:1,def:0}
+ ]},
+// 31
+{id:'rblur', name:'31 ラジアルブラー', st:'full',
+ def:{amount:0.4, mix:1},
+ frag:`
+  vec2 c = v_uv - 0.5;
+  vec4 acc = vec4(0.0);
+  for (int i = 0; i < 8; i++) {
+    float t = float(i) / 8.0 * 6.2832 * u_amount * 0.04;
+    mat2 R = mat2(cos(t), -sin(t), sin(t), cos(t));
+    acc += texture2D(u_tex, R*c + 0.5);
+  }
+  gl_FragColor = mix(texture2D(u_tex, v_uv), acc / 8.0, u_mix);`,
+ extras:[]},
+// 32
+{id:'zblur', name:'32 ズームブラー', st:'full',
+ def:{amount:0.4, mix:1},
+ frag:`
+  vec2 c = v_uv - 0.5;
+  vec4 acc = vec4(0.0);
+  for (int i = 0; i < 10; i++) {
+    float s = 1.0 + (float(i)/10.0 - 0.5) * u_amount * 0.4;
+    acc += texture2D(u_tex, c*s + 0.5);
+  }
+  gl_FragColor = mix(texture2D(u_tex, v_uv), acc / 10.0, u_mix);`,
+ extras:[]},
+// 33
+{id:'wave', name:'33 波形歪み', st:'full',
+ def:{amount:0.4, speed:0.5, mix:1},
+ frag:`
+  vec2 uv = v_uv;
+  uv.x += sin(uv.y * (10.0 + u_p1*40.0) + u_time * u_speed * 4.0) * u_amount * 0.05;
+  uv.y += cos(uv.x * (10.0 + u_p1*40.0) + u_time * u_speed * 4.0) * u_amount * 0.05;
+  gl_FragColor = mix(texture2D(u_tex, v_uv), sampleEdge(uv), u_mix);`,
+ extras:[
+   {key:'fr',label:'freq',min:0,max:1,def:0.4}
+ ]},
+// 34
+{id:'lensd', name:'34 レンズ歪み', st:'full',
+ def:{amount:0.5, mix:1},
+ frag:`
+  vec2 c = v_uv - 0.5;
+  float r2 = dot(c, c);
+  vec2 uv = c * (1.0 + (u_amount - 0.5) * 3.0 * r2) + 0.5;
+  gl_FragColor = mix(texture2D(u_tex, v_uv), sampleEdge(uv), u_mix);`,
+ extras:[]},
+// 35
+{id:'swirl', name:'35 渦巻き', st:'full',
+ def:{amount:0.5, speed:0.2, mix:1},
+ frag:`
+  vec2 c = v_uv - 0.5;
+  float r = length(c);
+  float a = atan(c.y, c.x) + (1.0 - r*2.0) * (u_amount-0.5) * 12.0 + u_time * u_speed;
+  vec2 uv = vec2(cos(a), sin(a)) * r + 0.5;
+  gl_FragColor = mix(texture2D(u_tex, v_uv), sampleEdge(uv), u_mix);`,
+ extras:[]},
+// 36
+{id:'noisedisp', name:'36 ノイズディスプレイス', st:'full',
+ def:{amount:0.4, speed:0.4, mix:1},
+ frag:`
+  float n1 = vnoise(v_uv * 6.0 + u_time * u_speed * 0.7);
+  float n2 = vnoise(v_uv * 6.0 + 70.0 + u_time * u_speed * 0.7);
+  vec2 uv = v_uv + (vec2(n1, n2) - 0.5) * u_amount * 0.15;
+  gl_FragColor = mix(texture2D(u_tex, v_uv), sampleEdge(uv), u_mix);`,
+ extras:[]},
+// 37
+{id:'liquify', name:'37 液状化ワープ', st:'lite',
+ def:{amount:0.4, speed:0.3, mix:1},
+ frag:`
+  vec2 uv = v_uv;
+  float t = u_time * u_speed;
+  float a = sin(uv.x * 5.0 + t) + cos(uv.y * 5.0 + t * 1.3);
+  uv.x += sin(a * 3.14159) * u_amount * 0.06;
+  uv.y += cos(a * 3.14159 + 1.0) * u_amount * 0.06;
+  gl_FragColor = mix(texture2D(u_tex, v_uv), sampleEdge(uv), u_mix);`,
+ extras:[]},
+// 38
+{id:'shake', name:'38 画面シェイク', st:'full',
+ def:{amount:0.4, speed:0.5, mix:1},
+ frag:`
+  float t = floor(u_time * (5.0 + u_speed * 60.0));
+  vec2 sh = (vec2(hash11(t), hash11(t + 7.3)) - 0.5) * u_amount * 0.12;
+  gl_FragColor = mix(texture2D(u_tex, v_uv), sampleEdge(v_uv + sh), u_mix);`,
+ extras:[]},
+// 39
+{id:'rgbshift', name:'39 RGBシフト', st:'full',
+ def:{amount:0.4, mix:1},
+ frag:`
+  float a = u_p1 * 6.2832;
+  vec2 d = vec2(cos(a), sin(a)) * u_amount * 0.03;
+  vec4 c = texture2D(u_tex, v_uv);
+  float r = texture2D(u_tex, v_uv + d).r;
+  float g = texture2D(u_tex, v_uv).g;
+  float b = texture2D(u_tex, v_uv - d).b;
+  gl_FragColor = vec4(mix(c.rgb, vec3(r,g,b), u_mix), c.a);`,
+ extras:[
+   {key:'ang',label:'angle',min:0,max:1,def:0}
+ ]},
+// 40
+{id:'chroma', name:'40 色収差', st:'full',
+ def:{amount:0.4, mix:1},
+ frag:`
+  vec2 c = v_uv - 0.5;
+  vec2 d = c * u_amount * 0.08;
+  vec4 col = texture2D(u_tex, v_uv);
+  float r = texture2D(u_tex, v_uv + d).r;
+  float g = texture2D(u_tex, v_uv).g;
+  float b = texture2D(u_tex, v_uv - d).b;
+  gl_FragColor = vec4(mix(col.rgb, vec3(r, g, b), u_mix), col.a);`,
+ extras:[]},
+// 41
+{id:'glitch', name:'41 グリッチ', st:'lite',
+ def:{amount:0.4, speed:0.5, mix:1},
+ frag:`
+  vec2 uv = v_uv;
+  float t = floor(u_time * (1.0 + u_speed * 8.0));
+  float row = floor(uv.y * 30.0);
+  float r = hash12(vec2(row, t));
+  float thr = 1.0 - u_amount * 0.6;
+  float push = step(thr, r) * (hash12(vec2(row*1.5, t)) - 0.5) * u_amount * 0.6;
+  uv.x += push;
+  vec3 col;
+  col.r = texture2D(u_tex, uv + vec2(u_amount*0.01, 0)).r;
+  col.g = texture2D(u_tex, uv).g;
+  col.b = texture2D(u_tex, uv - vec2(u_amount*0.01, 0)).b;
+  gl_FragColor = vec4(mix(texture2D(u_tex,v_uv).rgb, col, u_mix), 1.0);`,
+ extras:[]},
+// 42
+{id:'slice', name:'42 スライスずれ', st:'lite',
+ def:{amount:0.4, speed:0.4, mix:1},
+ frag:`
+  float row = floor(v_uv.y * (10.0 + u_amount * 40.0));
+  float t = floor(u_time * (1.0 + u_speed * 6.0));
+  float sh = (hash12(vec2(row, t)) - 0.5) * u_amount * 0.4;
+  vec2 uv = vec2(fract(v_uv.x + sh), v_uv.y);
+  gl_FragColor = mix(texture2D(u_tex, v_uv), texture2D(u_tex, uv), u_mix);`,
+ extras:[]},
+// 43
+{id:'block', name:'43 ブロックノイズ', st:'lite',
+ def:{amount:0.4, speed:0.4, mix:1},
+ frag:`
+  vec2 b = floor(v_uv * (8.0 + u_amount * 60.0));
+  float t = floor(u_time * (1.0 + u_speed * 6.0));
+  float r = hash12(b + t);
+  vec4 col = texture2D(u_tex, v_uv);
+  float thr = 1.0 - u_amount * 0.3;
+  if (r > thr) col.rgb = mix(col.rgb, vec3(r, hash12(b+t+1.0), hash12(b+t+2.0)), u_mix);
+  gl_FragColor = col;`,
+ extras:[]},
+// 44
+{id:'pixel', name:'44 ピクセル化', st:'full',
+ def:{amount:0.5, mix:1},
+ frag:`
+  float n = floor(8.0 + (1.0 - u_amount) * 240.0);
+  vec2 uv = (floor(v_uv * n) + 0.5) / n;
+  gl_FragColor = mix(texture2D(u_tex, v_uv), texture2D(u_tex, uv), u_mix);`,
+ extras:[]},
+// 45
+{id:'scan', name:'45 スキャンライン', st:'full',
+ def:{amount:0.5, mix:1},
+ frag:`
+  vec4 c = texture2D(u_tex, v_uv);
+  float s = sin(v_uv.y * u_res.y * (0.5 + u_p1*2.0)) * 0.5 + 0.5;
+  s = mix(1.0, s, u_amount);
+  gl_FragColor = vec4(mix(c.rgb, c.rgb * s, u_mix), c.a);`,
+ extras:[
+   {key:'dens',label:'density',min:0,max:1,def:0.5}
+ ]},
+// 46
+{id:'grain', name:'46 フィルムグレイン', st:'full',
+ def:{amount:0.3, mix:1},
+ frag:`
+  vec4 c = texture2D(u_tex, v_uv);
+  float n = hash12(v_uv + fract(u_time)) - 0.5;
+  gl_FragColor = vec4(c.rgb + vec3(n) * u_amount * 0.6 * u_mix, c.a);`,
+ extras:[]},
+// 47
+{id:'vhs', name:'47 VHSノイズ', st:'lite',
+ def:{amount:0.4, speed:0.4, mix:1},
+ frag:`
+  vec2 uv = v_uv;
+  uv.x += sin(uv.y * 80.0 + u_time * u_speed * 4.0) * u_amount * 0.004;
+  float row = floor(uv.y * 200.0);
+  float t = floor(u_time * 20.0);
+  if (hash12(vec2(row, t)) > 0.97) uv.x += u_amount * 0.04;
+  float band = sin(uv.y * 4.0 + u_time * u_speed) * 0.5 + 0.5;
+  band = smoothstep(0.7, 0.95, band) * u_amount * 0.3;
+  vec3 col;
+  col.r = texture2D(u_tex, uv + vec2(u_amount*0.005, 0)).r;
+  col.g = texture2D(u_tex, uv).g;
+  col.b = texture2D(u_tex, uv - vec2(u_amount*0.005, 0)).b;
+  col += band;
+  float n = (hash12(v_uv + fract(u_time)) - 0.5) * u_amount * 0.25;
+  col += n;
+  float sl = sin(v_uv.y * u_res.y) * 0.5 + 0.5;
+  col *= mix(1.0, sl, u_amount * 0.4);
+  gl_FragColor = vec4(mix(texture2D(u_tex, v_uv).rgb, col, u_mix), 1.0);`,
+ extras:[]},
+// 48
+{id:'trail', name:'48 残像 / トレイル', st:'full',
+ def:{amount:0.5, mix:1},
+ frag:`
+  vec4 c = texture2D(u_tex, v_uv);
+  vec4 prev = texture2D(u_prev, v_uv);
+  float decay = 1.0 - (1.0 - u_amount) * 0.4 - 0.04;
+  vec4 r = max(c, prev * decay);
+  gl_FragColor = mix(c, r, u_mix);`,
+ extras:[]},
+// 49
+{id:'feedback', name:'49 フィードバック', st:'full',
+ def:{amount:0.5, speed:0.2, mix:1},
+ frag:`
+  vec4 c = texture2D(u_tex, v_uv);
+  float z = 1.0 + (u_amount - 0.5) * 0.15;
+  float a = u_time * u_speed * 0.3;
+  vec2 uv = (v_uv - 0.5);
+  uv = mat2(cos(a),-sin(a),sin(a),cos(a)) * uv / z + 0.5;
+  vec4 prev = texture2D(u_prev, uv) * (0.85 + u_amount * 0.13);
+  vec4 r = max(c, prev);
+  gl_FragColor = mix(c, r, u_mix);`,
+ extras:[]},
+// 50
+{id:'audiobpm', name:'50 BPM / 音量連動', st:'mon',
+ def:{amount:1, mix:1},
+ frag:`gl_FragColor = texture2D(u_tex, v_uv);`,
+ extras:[]}
+];
+
+// ===================================================================
+// STATE
+// ===================================================================
+const state = {
+  source: { kind: 'demo', media: null, image: null, dirty: true },
+  effects: EFFECTS.map(e => {
+    const v = { amount: 0.5, speed: 0.5, mix: 1, bpmSync: 0, audioReactive: 0 };
+    if (e.def) Object.assign(v, e.def);
+    if (e.extras) e.extras.forEach(x => v[x.key] = x.def);
+    return { id: e.id, enabled: false, open: false, values: v };
+  }),
+  bpm: 120,
+  beatStart: performance.now() / 1000,
+  beatPhase: 0,
+  audio: { ctx: null, analyser: null, level: 0, gain: 2, source: null, kind: null },
+  resScale: 1,
+  recording: false,
+  recorder: null,
+  recChunks: [],
+  recStartTime: 0
+};
+
+// ===================================================================
+// WEBGL
+// ===================================================================
+const canvas = document.getElementById('view');
+const gl = canvas.getContext('webgl', {preserveDrawingBuffer: true, alpha: false, antialias: false}) ||
+           canvas.getContext('experimental-webgl');
+if (!gl) {
+  alert('WebGL が利用できません');
+  return;
+}
+
+function compile(type, src) {
+  const sh = gl.createShader(type);
+  gl.shaderSource(sh, src);
+  gl.compileShader(sh);
+  if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+    console.error('shader err:', gl.getShaderInfoLog(sh), '\n', src);
+    gl.deleteShader(sh); return null;
+  }
+  return sh;
+}
+function makeProgram(vert, frag) {
+  const v = compile(gl.VERTEX_SHADER, vert);
+  const f = compile(gl.FRAGMENT_SHADER, frag);
+  if (!v || !f) return null;
+  const p = gl.createProgram();
+  gl.attachShader(p, v); gl.attachShader(p, f);
+  gl.bindAttribLocation(p, 0, 'a_pos');
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+    console.error('prog err:', gl.getProgramInfoLog(p));
+    return null;
+  }
+  const u = {};
+  ['u_tex','u_prev','u_res','u_time','u_beat','u_audio',
+   'u_amount','u_speed','u_mix','u_p1','u_p2','u_p3','u_p4',
+   'u_colorA','u_colorB'].forEach(n => u[n] = gl.getUniformLocation(p, n));
+  return { program: p, u };
+}
+
+// quad buffer
+const quad = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]), gl.STATIC_DRAW);
+
+// programs (lazy)
+const programs = {};
+function getProg(eff) {
+  if (programs[eff.id] === undefined) {
+    const full = SHADER_HEADER + '\nvoid main(){\n' + eff.frag + '\n}';
+    programs[eff.id] = makeProgram(VERT, full);
+  }
+  return programs[eff.id];
+}
+const copyProg = makeProgram(VERT, COPY_FRAG);
+const copyTexLoc = gl.getUniformLocation(copyProg.program, 'u_tex');
+
+// FBOs
+function makeFBO(w, h) {
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  const fbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  return { fbo, tex, w, h };
+}
+
+let fboA = null, fboB = null, fboPrev = null;
+function ensureFBOs(w, h) {
+  if (fboA && fboA.w === w && fboA.h === h) return;
+  if (fboA) { gl.deleteTexture(fboA.tex); gl.deleteFramebuffer(fboA.fbo); }
+  if (fboB) { gl.deleteTexture(fboB.tex); gl.deleteFramebuffer(fboB.fbo); }
+  if (fboPrev) { gl.deleteTexture(fboPrev.tex); gl.deleteFramebuffer(fboPrev.fbo); }
+  fboA = makeFBO(w, h); fboB = makeFBO(w, h); fboPrev = makeFBO(w, h);
+}
+
+// source texture
+const srcTex = gl.createTexture();
+gl.bindTexture(gl.TEXTURE_2D, srcTex);
+gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 4, 4, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(16*4).fill(0));
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+// demo pattern offscreen
+const demoCanvas = document.createElement('canvas');
+demoCanvas.width = 640; demoCanvas.height = 360;
+const demoCtx = demoCanvas.getContext('2d');
+function drawDemo(t) {
+  const w = demoCanvas.width, h = demoCanvas.height;
+  const g = demoCtx.createLinearGradient(0,0,w,h);
+  const hue = (t*30) % 360;
+  g.addColorStop(0, `hsl(${hue}, 80%, 25%)`);
+  g.addColorStop(1, `hsl(${(hue+120)%360}, 80%, 18%)`);
+  demoCtx.fillStyle = g; demoCtx.fillRect(0,0,w,h);
+  for (let i = 0; i < 8; i++) {
+    demoCtx.beginPath();
+    const x = w/2 + Math.cos(t*0.7 + i)*w*0.3;
+    const y = h/2 + Math.sin(t*0.9 + i*1.3)*h*0.3;
+    const r = 30 + Math.sin(t*2 + i)*20 + i*8;
+    demoCtx.fillStyle = `hsla(${(hue + i*45)%360}, 90%, 65%, 0.6)`;
+    demoCtx.arc(x, y, r, 0, Math.PI*2);
+    demoCtx.fill();
+  }
+  demoCtx.strokeStyle = 'rgba(255,255,255,0.4)';
+  demoCtx.lineWidth = 2;
+  for (let i = 0; i < 12; i++) {
+    demoCtx.beginPath();
+    const a = t*0.5 + i*Math.PI/6;
+    demoCtx.moveTo(w/2, h/2);
+    demoCtx.lineTo(w/2 + Math.cos(a)*w, h/2 + Math.sin(a)*h);
+    demoCtx.stroke();
+  }
+  demoCtx.fillStyle = '#fff';
+  demoCtx.font = 'bold 48px sans-serif';
+  demoCtx.textAlign = 'center';
+  demoCtx.fillText('VJ FX', w/2, h/2 - 20);
+  demoCtx.font = '20px sans-serif';
+  demoCtx.fillText('DEMO', w/2, h/2 + 20);
+}
+
+function uploadSource() {
+  const s = state.source;
+  try {
+    if (s.kind === 'image' && s.image && s.image.complete && s.image.naturalWidth) {
+      if (s.dirty) {
+        gl.bindTexture(gl.TEXTURE_2D, srcTex);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, s.image);
+        s.dirty = false;
+      }
+    } else if (s.kind === 'video' && s.media && s.media.readyState >= 2) {
+      gl.bindTexture(gl.TEXTURE_2D, srcTex);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, s.media);
+    } else {
+      drawDemo(performance.now() / 1000);
+      gl.bindTexture(gl.TEXTURE_2D, srcTex);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, demoCanvas);
+    }
+  } catch (e) { /* ignore mid-load errors */ }
+}
+
+// ===================================================================
+// COLOR HELPERS
+// ===================================================================
+function hexToVec3(h) {
+  if (typeof h !== 'string') return [1,1,1];
+  const m = h.replace('#','');
+  const r = parseInt(m.substr(0,2),16)/255;
+  const g = parseInt(m.substr(2,2),16)/255;
+  const b = parseInt(m.substr(4,2),16)/255;
+  return [r,g,b];
+}
+
+// ===================================================================
+// RENDER
+// ===================================================================
+function bindFBO(f) {
+  if (f) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, f.fbo);
+    gl.viewport(0, 0, f.w, f.h);
+  } else {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+  }
+}
+function drawQuad() {
+  gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+}
+
+let frameCount = 0, lastFps = performance.now(), curFps = 0;
+let startTime = performance.now() / 1000;
+
+function effectiveAmount(eff) {
+  const v = eff.values;
+  let amt = v.amount;
+  if (v.bpmSync) amt += v.bpmSync * 0.5 * Math.sin(state.beatPhase * Math.PI * 2);
+  if (v.audioReactive) amt += v.audioReactive * 0.5 * state.audio.level;
+  return Math.max(0, Math.min(1.5, amt));
+}
+
+function render() {
+  const now = performance.now() / 1000;
+  const t = now - startTime;
+  // BPM phase
+  state.beatPhase = ((now - state.beatStart) * (state.bpm / 60)) % 1;
+
+  // upload source
+  uploadSource();
+
+  // pipeline
+  const enabled = state.effects.filter(e => e.enabled);
+  const W = canvas.width, H = canvas.height;
+  ensureFBOs(W, H);
+
+  let curTex = srcTex;
+  let target = fboA, alt = fboB;
+  let didPass = false;
+
+  for (const eff of enabled) {
+    const def = EFFECTS.find(d => d.id === eff.id);
+    if (!def || def.st === 'mon') continue;
+    const prog = getProg(def);
+    if (!prog) continue;
+
+    bindFBO(target);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.useProgram(prog.program);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, curTex);
+    gl.uniform1i(prog.u.u_tex, 0);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, fboPrev.tex);
+    gl.uniform1i(prog.u.u_prev, 1);
+
+    gl.uniform2f(prog.u.u_res, target.w, target.h);
+    gl.uniform1f(prog.u.u_time, t);
+    gl.uniform1f(prog.u.u_beat, state.beatPhase);
+    gl.uniform1f(prog.u.u_audio, state.audio.level);
+
+    gl.uniform1f(prog.u.u_amount, effectiveAmount(eff));
+    gl.uniform1f(prog.u.u_speed, eff.values.speed);
+    gl.uniform1f(prog.u.u_mix, eff.values.mix);
+
+    // map first 4 extras to p1..p4 (color extras get separate slot)
+    const ps = [0,0,0,0];
+    let pi = 0;
+    let cA = [1,1,1], cB = [0,0,0];
+    if (def.extras) {
+      for (const x of def.extras) {
+        if (x.type === 'color') {
+          if (x.key === 'cA' || x.key === 'colorA') cA = hexToVec3(eff.values[x.key]);
+          else if (x.key === 'cB' || x.key === 'colorB') cB = hexToVec3(eff.values[x.key]);
+        } else {
+          if (pi < 4) ps[pi++] = eff.values[x.key];
+        }
+      }
+    }
+    gl.uniform1f(prog.u.u_p1, ps[0]);
+    gl.uniform1f(prog.u.u_p2, ps[1]);
+    gl.uniform1f(prog.u.u_p3, ps[2]);
+    gl.uniform1f(prog.u.u_p4, ps[3]);
+    gl.uniform3f(prog.u.u_colorA, cA[0], cA[1], cA[2]);
+    gl.uniform3f(prog.u.u_colorB, cB[0], cB[1], cB[2]);
+
+    drawQuad();
+
+    curTex = target.tex;
+    [target, alt] = [alt, target];
+    didPass = true;
+  }
+
+  // final draw to canvas (use copyProg)
+  bindFBO(null);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.useProgram(copyProg.program);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, curTex);
+  gl.uniform1i(copyTexLoc, 0);
+  drawQuad();
+
+  // copy current to fboPrev for next frame
+  bindFBO(fboPrev);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.useProgram(copyProg.program);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, curTex);
+  gl.uniform1i(copyTexLoc, 0);
+  drawQuad();
+
+  // FPS
+  frameCount++;
+  if (now * 1000 - lastFps > 1000) {
+    curFps = frameCount;
+    frameCount = 0;
+    lastFps = now * 1000;
+    document.getElementById('fpsInfo').textContent =
+      `FPS ${curFps}  ${canvas.width}x${canvas.height}  passes:${enabled.filter(e=>{const d=EFFECTS.find(D=>D.id===e.id);return d&&d.st!=='mon';}).length}`;
+  }
+
+  // HUD
+  document.getElementById('hud').innerHTML =
+    `<span class="k">BPM</span> <span class="v">${state.bpm.toFixed(1)}</span>  ` +
+    `<span class="k">beat</span> <span class="v">${state.beatPhase.toFixed(2)}</span>  ` +
+    `<span class="k">audio</span> <span class="v">${state.audio.level.toFixed(2)}</span>`;
+  document.getElementById('beatBar').value = state.beatPhase;
+  document.getElementById('audioBar').value = Math.min(1, state.audio.level);
+
+  requestAnimationFrame(render);
+}
+
+// ===================================================================
+// CANVAS SIZING
+// ===================================================================
+function resizeCanvas() {
+  const wrap = document.getElementById('viewWrap');
+  const cR = document.getElementById('center').getBoundingClientRect();
+  const baseW = 1280, baseH = 720;
+  const scale = state.resScale;
+  // intrinsic resolution
+  canvas.width  = Math.max(64, Math.floor(baseW * scale));
+  canvas.height = Math.max(64, Math.floor(baseH * scale));
+  // fit display to center area, preserve 16:9
+  const aw = cR.width - 16, ah = cR.height - 16;
+  const ar = baseW / baseH;
+  let dw = aw, dh = aw / ar;
+  if (dh > ah) { dh = ah; dw = ah * ar; }
+  canvas.style.width = dw + 'px';
+  canvas.style.height = dh + 'px';
+}
+window.addEventListener('resize', resizeCanvas);
+
+// ===================================================================
+// SOURCE LOADING
+// ===================================================================
+const fileInput = document.getElementById('fileInput');
+fileInput.addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const url = URL.createObjectURL(f);
+  if (f.type.startsWith('image/')) {
+    const img = new Image();
+    img.onload = () => {
+      state.source = { kind:'image', media:null, image:img, dirty:true };
+    };
+    img.src = url;
+  } else if (f.type.startsWith('video/')) {
+    const v = document.createElement('video');
+    v.src = url; v.loop = true; v.muted = true; v.playsInline = true;
+    v.play().catch(()=>{});
+    state.source = { kind:'video', media:v, image:null, dirty:false };
+  }
+});
+document.getElementById('useDemo').addEventListener('click', () => {
+  state.source = { kind:'demo', media:null, image:null, dirty:true };
+});
+document.getElementById('playPause').addEventListener('click', () => {
+  if (state.source.kind === 'video' && state.source.media) {
+    if (state.source.media.paused) state.source.media.play();
+    else state.source.media.pause();
+  }
+});
+
+// ===================================================================
+// BPM
+// ===================================================================
+const bpmInput = document.getElementById('bpmInput');
+bpmInput.addEventListener('input', () => {
+  state.bpm = parseFloat(bpmInput.value) || 120;
+  state.beatStart = performance.now() / 1000;
+});
+let tapTimes = [];
+document.getElementById('tapBpm').addEventListener('click', () => {
+  const now = performance.now();
+  tapTimes.push(now);
+  if (tapTimes.length > 5) tapTimes.shift();
+  if (tapTimes.length >= 2) {
+    const diffs = [];
+    for (let i = 1; i < tapTimes.length; i++) diffs.push(tapTimes[i] - tapTimes[i-1]);
+    const avg = diffs.reduce((a,b)=>a+b,0) / diffs.length;
+    if (avg < 2000) {
+      state.bpm = Math.max(20, Math.min(300, 60000 / avg));
+      bpmInput.value = state.bpm.toFixed(1);
+      state.beatStart = now / 1000;
+    }
+  }
+  setTimeout(() => { if (performance.now() - now > 1500) tapTimes = []; }, 1600);
+});
+
+// ===================================================================
+// AUDIO
+// ===================================================================
+function ensureAudioCtx() {
+  if (!state.audio.ctx) {
+    state.audio.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    state.audio.analyser = state.audio.ctx.createAnalyser();
+    state.audio.analyser.fftSize = 256;
+    state.audio.buf = new Uint8Array(state.audio.analyser.frequencyBinCount);
+  }
+  if (state.audio.ctx.state === 'suspended') state.audio.ctx.resume();
+}
+function disconnectAudio() {
+  try { state.audio.source && state.audio.source.disconnect(); } catch(e){}
+  state.audio.source = null; state.audio.kind = null;
+}
+document.getElementById('micBtn').addEventListener('click', async () => {
+  ensureAudioCtx();
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    disconnectAudio();
+    const src = state.audio.ctx.createMediaStreamSource(stream);
+    src.connect(state.audio.analyser);
+    state.audio.source = src; state.audio.kind = 'mic';
+    document.getElementById('micBtn').textContent = 'マイクON';
+  } catch (e) {
+    alert('マイク取得失敗: ' + e.message);
+  }
+});
+document.getElementById('audioFile').addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  ensureAudioCtx();
+  disconnectAudio();
+  const aud = new Audio(URL.createObjectURL(f));
+  aud.loop = true;
+  aud.crossOrigin = 'anonymous';
+  const src = state.audio.ctx.createMediaElementSource(aud);
+  src.connect(state.audio.analyser);
+  state.audio.analyser.connect(state.audio.ctx.destination);
+  aud.play().catch(()=>{});
+  state.audio.source = src; state.audio.kind = 'file';
+  state.audio.elem = aud;
+});
+document.getElementById('audioGain').addEventListener('input', e => {
+  state.audio.gain = parseFloat(e.target.value);
+  document.getElementById('audioGainV').textContent = state.audio.gain.toFixed(1);
+});
+function pollAudio() {
+  if (state.audio.analyser) {
+    state.audio.analyser.getByteFrequencyData(state.audio.buf);
+    let sum = 0;
+    for (let i = 0; i < state.audio.buf.length; i++) sum += state.audio.buf[i];
+    const avg = sum / state.audio.buf.length / 255;
+    state.audio.level = Math.min(1, avg * state.audio.gain);
+  } else {
+    state.audio.level *= 0.95;
+  }
+  requestAnimationFrame(pollAudio);
+}
+
+// ===================================================================
+// UI: EFFECT LIST
+// ===================================================================
+const effectList = document.getElementById('effectList');
+function buildEffectList() {
+  effectList.innerHTML = '';
+  state.effects.forEach((eff, idx) => {
+    const def = EFFECTS.find(d => d.id === eff.id);
+    const card = document.createElement('div');
+    card.className = 'fx' + (eff.enabled ? ' on' : '') + (eff.open ? ' open' : '');
+    const stCls = def.st;
+    const stLabel = def.st === 'full' ? '実装' : def.st === 'lite' ? '簡易' : '監視';
+    card.innerHTML = `
+      <div class="fx-head">
+        <span class="num">${(idx+1).toString().padStart(2,'0')}</span>
+        <input type="checkbox" ${eff.enabled?'checked':''} data-act="toggle">
+        <span class="name">${def.name}</span>
+        <span class="badge ${stCls}">${stLabel}</span>
+        <button class="mvbtn" data-act="up">▲</button>
+        <button class="mvbtn" data-act="down">▼</button>
+      </div>
+      <div class="fx-body"></div>
+    `;
+    const head = card.querySelector('.fx-head');
+    head.querySelector('.name').addEventListener('click', () => {
+      eff.open = !eff.open;
+      card.classList.toggle('open', eff.open);
+      if (eff.open && !card.querySelector('.fx-body').children.length)
+        buildEffectBody(card.querySelector('.fx-body'), eff, def);
+    });
+    head.querySelector('[data-act=toggle]').addEventListener('change', e => {
+      eff.enabled = e.target.checked;
+      card.classList.toggle('on', eff.enabled);
+      // pre-compile shader
+      if (eff.enabled && def.st !== 'mon') getProg(def);
+      updateFxStatus();
+    });
+    head.querySelector('[data-act=up]').addEventListener('click', e => {
+      e.stopPropagation();
+      if (idx > 0) {
+        [state.effects[idx-1], state.effects[idx]] = [state.effects[idx], state.effects[idx-1]];
+        buildEffectList();
+      }
+    });
+    head.querySelector('[data-act=down]').addEventListener('click', e => {
+      e.stopPropagation();
+      if (idx < state.effects.length-1) {
+        [state.effects[idx+1], state.effects[idx]] = [state.effects[idx], state.effects[idx+1]];
+        buildEffectList();
+      }
+    });
+    if (eff.open) buildEffectBody(card.querySelector('.fx-body'), eff, def);
+    effectList.appendChild(card);
+  });
+  updateFxStatus();
+}
+
+function buildEffectBody(body, eff, def) {
+  body.innerHTML = '';
+  const baseParams = [
+    {key:'amount',  label:'amount',  min:0, max:1, step:0.001},
+    {key:'speed',   label:'speed',   min:0, max:1, step:0.001},
+    {key:'mix',     label:'mix',     min:0, max:1, step:0.001},
+    {key:'bpmSync', label:'bpmSync', min:0, max:1, step:0.001},
+    {key:'audioReactive', label:'audio', min:0, max:1, step:0.001},
+  ];
+  baseParams.forEach(p => body.appendChild(makeRange(eff, p)));
+  if (def.extras && def.extras.length) {
+    const hr = document.createElement('hr'); body.appendChild(hr);
+    def.extras.forEach(x => {
+      if (x.type === 'color') body.appendChild(makeColor(eff, x));
+      else body.appendChild(makeRange(eff, {key:x.key, label:x.label, min:x.min, max:x.max, step:0.001}));
+    });
+  }
+  if (def.id === 'audiobpm') {
+    const note = document.createElement('div');
+    note.className = 'note';
+    note.textContent = '※ このスロットは状態表示用。各効果の bpmSync / audio スライダで個別に同期させてください。';
+    body.appendChild(note);
+  }
+}
+
+function makeRange(eff, p) {
+  const row = document.createElement('div');
+  row.className = 'row';
+  const lab = document.createElement('label'); lab.textContent = p.label;
+  const inp = document.createElement('input');
+  inp.type = 'range'; inp.min = p.min; inp.max = p.max; inp.step = p.step || 0.01;
+  inp.value = eff.values[p.key] ?? 0;
+  const v = document.createElement('span'); v.className = 'v';
+  v.textContent = (+inp.value).toFixed(2);
+  inp.addEventListener('input', () => {
+    eff.values[p.key] = parseFloat(inp.value);
+    v.textContent = parseFloat(inp.value).toFixed(2);
+  });
+  row.appendChild(lab); row.appendChild(inp); row.appendChild(v);
+  return row;
+}
+function makeColor(eff, x) {
+  const row = document.createElement('div');
+  row.className = 'row';
+  const lab = document.createElement('label'); lab.textContent = x.label;
+  const inp = document.createElement('input');
+  inp.type = 'color'; inp.value = eff.values[x.key] || x.def;
+  inp.addEventListener('input', () => { eff.values[x.key] = inp.value; });
+  row.appendChild(lab); row.appendChild(inp);
+  return row;
+}
+
+function updateFxStatus() {
+  const total = state.effects.length;
+  const on = state.effects.filter(e => e.enabled).length;
+  const full = EFFECTS.filter(e => e.st === 'full').length;
+  const lite = EFFECTS.filter(e => e.st === 'lite').length;
+  const mon  = EFFECTS.filter(e => e.st === 'mon').length;
+  document.getElementById('fxStatus').innerHTML =
+    `<b>${on}</b> / ${total} 有効 &nbsp; <span style="color:#88d8a3">実装 ${full}</span> ` +
+    `<span style="color:#d8c188">簡易 ${lite}</span> ` +
+    `<span style="color:#88b3d8">監視 ${mon}</span>`;
+}
+
+document.getElementById('fxAllOff').addEventListener('click', () => {
+  state.effects.forEach(e => e.enabled = false);
+  buildEffectList();
+});
+document.getElementById('fxExpandAll').addEventListener('click', () => {
+  state.effects.forEach(e => e.open = true);
+  buildEffectList();
+});
+document.getElementById('fxCollapseAll').addEventListener('click', () => {
+  state.effects.forEach(e => e.open = false);
+  buildEffectList();
+});
+
+// ===================================================================
+// PRESET
+// ===================================================================
+function exportPreset() {
+  const data = {
+    version: 1,
+    bpm: state.bpm,
+    effects: state.effects.map(e => ({ id: e.id, enabled: e.enabled, values: {...e.values} }))
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'vjfx-preset-' + Date.now() + '.json';
+  a.click();
+}
+function importPreset(file) {
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const data = JSON.parse(r.result);
+      if (data.bpm) { state.bpm = data.bpm; bpmInput.value = data.bpm; }
+      if (data.effects) {
+        const order = [];
+        data.effects.forEach(p => {
+          const i = state.effects.findIndex(e => e.id === p.id);
+          if (i >= 0) {
+            state.effects[i].enabled = !!p.enabled;
+            Object.assign(state.effects[i].values, p.values || {});
+            order.push(state.effects.splice(i, 1)[0]);
+          }
+        });
+        // append remaining (any not in preset)
+        state.effects = order.concat(state.effects);
+      }
+      buildEffectList();
+    } catch (e) { alert('プリセット読込失敗: ' + e.message); }
+  };
+  r.readAsText(file);
+}
+document.getElementById('presetSave').addEventListener('click', exportPreset);
+document.getElementById('presetLoad').addEventListener('click', () =>
+  document.getElementById('presetFile').click());
+document.getElementById('presetFile').addEventListener('change', e => {
+  if (e.target.files[0]) importPreset(e.target.files[0]);
+});
+document.getElementById('presetClear').addEventListener('click', () => {
+  state.effects.forEach(e => {
+    e.enabled = false;
+    const def = EFFECTS.find(d => d.id === e.id);
+    e.values = { amount:0.5, speed:0.5, mix:1, bpmSync:0, audioReactive:0 };
+    if (def.def) Object.assign(e.values, def.def);
+    if (def.extras) def.extras.forEach(x => e.values[x.key] = x.def);
+  });
+  buildEffectList();
+});
+document.getElementById('presetRand').addEventListener('click', () => {
+  state.effects.forEach(e => e.enabled = false);
+  // pick 3-7 effects randomly
+  const candidates = state.effects.filter(e => {
+    const d = EFFECTS.find(D => D.id === e.id);
+    return d && d.st !== 'mon';
+  });
+  const n = 3 + Math.floor(Math.random() * 5);
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i+1));
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  }
+  candidates.slice(0, n).forEach(e => {
+    e.enabled = true;
+    e.values.amount = 0.2 + Math.random() * 0.7;
+    e.values.speed  = Math.random();
+    e.values.mix    = 0.5 + Math.random() * 0.5;
+    e.values.bpmSync = Math.random() < 0.4 ? Math.random() * 0.6 : 0;
+    e.values.audioReactive = Math.random() < 0.4 ? Math.random() * 0.6 : 0;
+    const def = EFFECTS.find(d => d.id === e.id);
+    if (def.extras) def.extras.forEach(x => {
+      if (x.type === 'color') {
+        e.values[x.key] = '#' + Math.floor(Math.random()*0xffffff).toString(16).padStart(6,'0');
+      } else {
+        e.values[x.key] = x.min + Math.random() * (x.max - x.min);
+      }
+    });
+  });
+  buildEffectList();
+});
+
+// ===================================================================
+// RECORDING
+// ===================================================================
+const recBtn = document.getElementById('recBtn');
+const recInfo = document.getElementById('recInfo');
+recBtn.addEventListener('click', () => {
+  if (!state.recording) startRec();
+  else stopRec();
+});
+function pickMime() {
+  const mimes = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+  for (const m of mimes) if (MediaRecorder.isTypeSupported(m)) return m;
+  return '';
+}
+function startRec() {
+  try {
+    const stream = canvas.captureStream(60);
+    const mime = pickMime();
+    state.recorder = new MediaRecorder(stream, mime ? {mimeType: mime, videoBitsPerSecond: 8000000} : {});
+    state.recChunks = [];
+    state.recorder.ondataavailable = e => { if (e.data.size > 0) state.recChunks.push(e.data); };
+    state.recorder.onstop = () => {
+      const blob = new Blob(state.recChunks, {type: 'video/webm'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'vjfx-rec-' + Date.now() + '.webm';
+      a.click();
+    };
+    state.recorder.start(250);
+    state.recording = true;
+    state.recStartTime = performance.now();
+    recBtn.innerHTML = '<span class="recRing"></span>停止';
+    recBtn.classList.add('danger');
+    updateRecInfo();
+  } catch (e) {
+    alert('録画開始失敗: ' + e.message);
+  }
+}
+function stopRec() {
+  if (state.recorder && state.recording) {
+    state.recorder.stop();
+  }
+  state.recording = false;
+  recBtn.innerHTML = '● 録画';
+  recBtn.classList.remove('danger');
+  recInfo.textContent = 'stop';
+}
+function updateRecInfo() {
+  if (!state.recording) return;
+  const sec = (performance.now() - state.recStartTime) / 1000;
+  recInfo.innerHTML = `<span class="recRing"></span>REC ${sec.toFixed(1)}s`;
+  setTimeout(updateRecInfo, 200);
+}
+document.getElementById('snapBtn').addEventListener('click', () => {
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = 'vjfx-snap-' + Date.now() + '.png';
+  a.click();
+});
+
+// ===================================================================
+// FULLSCREEN / PANEL HIDE
+// ===================================================================
+document.getElementById('fsBtn').addEventListener('click', () => {
+  const el = document.getElementById('center');
+  if (!document.fullscreenElement) {
+    (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
+  } else {
+    document.exitFullscreen();
+  }
+});
+document.getElementById('hidePanelBtn').addEventListener('click', () => {
+  document.getElementById('app').classList.toggle('fs');
+  setTimeout(resizeCanvas, 50);
+});
+document.addEventListener('fullscreenchange', () => setTimeout(resizeCanvas, 50));
+document.addEventListener('keydown', e => {
+  if (e.key === 'f' && !e.target.matches('input,textarea')) {
+    document.getElementById('fsBtn').click();
+  }
+  if (e.key === 'h' && !e.target.matches('input,textarea')) {
+    document.getElementById('hidePanelBtn').click();
+  }
+});
+
+// ===================================================================
+// RES SCALE
+// ===================================================================
+document.getElementById('resScale').addEventListener('input', e => {
+  state.resScale = parseFloat(e.target.value);
+  document.getElementById('resScaleV').textContent = state.resScale.toFixed(2);
+  resizeCanvas();
+});
+
+// ===================================================================
+// INIT
+// ===================================================================
+buildEffectList();
+resizeCanvas();
+requestAnimationFrame(render);
+requestAnimationFrame(pollAudio);
+
+})();
+</script>
+</body>
+</html>
