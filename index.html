@@ -6,173 +6,253 @@
 <title>VJ FX Maker</title>
 <style>
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; height: 100%; background: #0e0f12; color: #e7e8ea;
+:root {
+  --left-w: 280px;
+  --right-w: 330px;
+  --bottom-h: 210px;
+  --panel: #15171c;
+  --panel-2: #191c22;
+  --line: #2a2e36;
+  --line-soft: #22262d;
+  --text: #e7e8ea;
+  --muted: #8a92a3;
+  --accent: #6a86d8;
+  --green: #88d8a3;
+  --gold: #d8c188;
+}
+html, body { margin: 0; padding: 0; height: 100%; background: #090a0d; color: var(--text);
   font: 12px/1.4 system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Yu Gothic", sans-serif;
   overflow: hidden; }
 button, input, select { font: inherit; color: inherit; }
-button { background: #1c1f25; border: 1px solid #2a2e36; padding: 5px 9px; border-radius: 4px; cursor: pointer; transition: background .1s; }
-button:hover { background: #262b34; }
-button:active { background: #2e333d; }
+button { background: #1e2229; border: 1px solid var(--line); padding: 5px 9px; border-radius: 4px; cursor: pointer; transition: background .1s, border-color .1s; white-space: nowrap; }
+button:hover { background: #282d36; border-color: #3a4150; }
+button:active { background: #303641; }
 button.primary { background: #2c3554; border-color: #4a5b8a; }
 button.primary:hover { background: #34406b; }
 button.danger { background: #4a2c2c; border-color: #8a4a4a; }
-input[type=text], input[type=number] { background: #14161b; border: 1px solid #2a2e36; padding: 3px 6px; border-radius: 3px; color: #e7e8ea; }
-input[type=number] { width: 64px; }
-input[type=range] { width: 100%; accent-color: #6a86d8; }
-input[type=color] { width: 28px; height: 22px; padding: 0; border: 1px solid #2a2e36; background: #14161b; cursor: pointer; }
+input[type=text], input[type=number] { background: #101218; border: 1px solid var(--line); padding: 3px 6px; border-radius: 3px; color: var(--text); }
+input[type=number] { width: 68px; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+input[type=color] { width: 28px; height: 22px; padding: 0; border: 1px solid var(--line); background: #101218; cursor: pointer; }
 input[type=file] { font-size: 11px; max-width: 100%; }
 
-#app { display: grid; grid-template-columns: 240px 1fr 320px; height: 100vh; }
-#app.fs #left, #app.fs #right { display: none; }
-#app.fs { grid-template-columns: 1fr; }
+#app {
+  display: grid;
+  grid-template-columns: var(--left-w) 6px minmax(0, 1fr) 6px var(--right-w);
+  grid-template-rows: 42px minmax(0, 1fr) 6px var(--bottom-h);
+  grid-template-areas:
+    "top top top top top"
+    "left resizeL center resizeR right"
+    "resizeB resizeB resizeB resizeB resizeB"
+    "bottom bottom bottom bottom bottom";
+  height: 100vh;
+  min-width: 780px;
+}
+#app.fs {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+  grid-template-areas: "center";
+}
+#app.fs #topbar, #app.fs #left, #app.fs #right, #app.fs #bottom, #app.fs .panel-resizer { display: none; }
 
-#left, #right { background: #15171c; padding: 10px; overflow-y: auto; }
-#left { border-right: 1px solid #23262d; }
-#right { border-left: 1px solid #23262d; }
-#center { display: flex; flex-direction: column; align-items: center; justify-content: center;
-  background: #07080a; position: relative; min-width: 0; min-height: 0; padding: 8px; }
+#topbar { grid-area: top; display: flex; align-items: center; gap: 12px; padding: 6px 10px; background: #111318; border-bottom: 1px solid var(--line); min-width: 0; }
+.brand { font-weight: 700; letter-spacing: .02em; color: #f2f3f5; flex: 0 0 auto; }
+.top-group { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.top-group.grow { flex: 1 1 auto; }
+.top-label { color: var(--muted); font-size: 10px; text-transform: uppercase; }
+#timecode { font: 12px/1.2 ui-monospace, Consolas, monospace; color: #cbd3e2; min-width: 66px; text-align: right; }
+#topbar input[type=range] { width: 90px; }
+
+#left, #right, #bottom { background: var(--panel); overflow: hidden; min-width: 0; min-height: 0; }
+#left { grid-area: left; border-right: 1px solid var(--line-soft); display: flex; flex-direction: column; }
+#right { grid-area: right; border-left: 1px solid var(--line-soft); display: flex; flex-direction: column; }
+#bottom { grid-area: bottom; border-top: 1px solid var(--line-soft); display: flex; flex-direction: column; }
+.panel-scroll { overflow: auto; padding: 10px; min-height: 0; }
+.panel-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--line-soft); background: #171a20; min-height: 35px; }
+.panel-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 700; flex: 1; }
+
+#center { grid-area: center; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: #050608; position: relative; min-width: 0; min-height: 0; padding: 8px; }
 #viewWrap { position: relative; max-width: 100%; max-height: 100%; display: flex; align-items: center; justify-content: center; }
-canvas#view { display: block; max-width: 100%; max-height: calc(100vh - 16px); background: #000;
+canvas#view { display: block; max-width: 100%; max-height: 100%; background: #000;
   box-shadow: 0 0 0 1px #23262d, 0 8px 30px #0008; }
 #hud { position: absolute; bottom: 8px; left: 12px; font: 10px/1.3 ui-monospace, Consolas, monospace; color: #6a7180; pointer-events: none; text-shadow: 0 0 3px #000; }
 #hud .k { color: #9ab; }
 #hud .v { color: #cde; }
 
-.section { margin-bottom: 14px; }
-.section h3 { margin: 4px 0 6px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: #8a92a3; font-weight: 600; }
-.row { display: flex; gap: 6px; align-items: center; margin: 3px 0; }
-.row label { flex: 0 0 60px; font-size: 11px; color: #b5bbc8; }
-.row .v { color: #888f9d; font-variant-numeric: tabular-nums; min-width: 36px; text-align: right; font-size: 10px; }
+.panel-resizer { background: #101217; position: relative; }
+.panel-resizer::after { content: ""; position: absolute; inset: 0; background: transparent; }
+#resizeLeft { grid-area: resizeL; cursor: col-resize; border-left: 1px solid #0b0c10; border-right: 1px solid #242832; }
+#resizeRight { grid-area: resizeR; cursor: col-resize; border-left: 1px solid #242832; border-right: 1px solid #0b0c10; }
+#resizeBottom { grid-area: resizeB; cursor: row-resize; border-top: 1px solid #242832; border-bottom: 1px solid #0b0c10; }
+.is-resizing, .is-resizing * { cursor: inherit !important; user-select: none !important; }
 
+.section { margin-bottom: 14px; }
+.section h3 { margin: 4px 0 6px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+.row { display: flex; gap: 6px; align-items: center; margin: 4px 0; min-width: 0; }
+.row label { flex: 0 0 76px; font-size: 11px; color: #b5bbc8; }
+.row .v { color: #888f9d; font-variant-numeric: tabular-nums; min-width: 36px; text-align: right; font-size: 10px; }
 .toolbar { display: flex; gap: 4px; flex-wrap: wrap; }
 .toolbar button { padding: 4px 8px; font-size: 11px; }
 
-#fxStatus { font-size: 10px; color: #888f9d; margin-bottom: 6px; line-height: 1.5; }
-
-.fx { background: #181b21; border: 1px solid #23262d; border-radius: 4px; margin-bottom: 5px; }
-.fx.on { border-color: #4a5b8a; box-shadow: 0 0 0 1px #2c3554 inset; }
-.fx-head { display: flex; align-items: center; gap: 5px; padding: 5px 7px; user-select: none; }
-.fx-head .num { width: 22px; color: #6a7180; font-variant-numeric: tabular-nums; font-size: 10px; flex: 0 0 auto; }
-.fx-head .name { flex: 1; font-size: 12px; cursor: pointer; }
-.fx-head input[type=checkbox] { margin: 0; flex: 0 0 auto; }
-.fx-head .mvbtn { padding: 1px 5px; font-size: 10px; line-height: 1; }
+#fxStatus { font-size: 10px; color: #a0a7b5; line-height: 1.5; }
+.category { border: 1px solid var(--line-soft); border-radius: 4px; overflow: hidden; background: #12151a; margin-bottom: 7px; }
+.category-head { display: flex; align-items: center; gap: 6px; width: 100%; border: 0; border-radius: 0; background: #1b1f26; padding: 6px 8px; text-align: left; }
+.category-head .twisty { color: var(--muted); width: 10px; }
+.category-head .cat-name { flex: 1; font-weight: 650; }
+.category-head .cat-count { color: var(--muted); font: 10px/1 ui-monospace, Consolas, monospace; }
+.category-body { display: grid; gap: 1px; background: #111318; padding: 2px; }
+.category.closed .category-body { display: none; }
+.lib-row, .lane-row { display: flex; align-items: center; gap: 6px; min-width: 0; border: 1px solid transparent; background: #171a20; cursor: pointer; }
+.lib-row { padding: 5px 6px; }
+.lib-row:hover, .lane-row:hover { background: #20252d; }
+.lib-row.selected, .lane-row.selected { border-color: #536aa7; background: #202845; }
+.lib-row.on, .lane-row.on { box-shadow: inset 3px 0 0 var(--accent); }
+.lib-name, .lane-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mvbtn { padding: 1px 6px; font-size: 10px; line-height: 1.1; }
+.num { width: 24px; color: #6a7180; font-variant-numeric: tabular-nums; font-size: 10px; flex: 0 0 auto; }
 .badge { font-size: 9px; padding: 1px 5px; border-radius: 8px; background: #2a2e36; color: #b5bbc8; flex: 0 0 auto; }
-.badge.full { background: #1f3d2a; color: #88d8a3; }
-.badge.lite { background: #3d352a; color: #d8c188; }
+.badge.full { background: #1f3d2a; color: var(--green); }
+.badge.lite { background: #3d352a; color: var(--gold); }
 .badge.mon  { background: #2a3a4d; color: #88b3d8; }
-.fx-body { display: none; padding: 6px 8px 8px; border-top: 1px solid #23262d; }
-.fx.open .fx-body { display: block; }
-.fx-body .row label { flex-basis: 70px; }
+.selected-title { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.selected-title h2 { margin: 0; font-size: 14px; line-height: 1.2; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.selected-actions { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
+.fx-body { padding-top: 2px; }
+.fx-body .row label { flex-basis: 82px; }
+.empty { color: var(--muted); font-size: 11px; padding: 10px; border: 1px dashed #323743; border-radius: 4px; background: #111318; }
+
+.timeline-ruler { position: relative; height: 28px; border-bottom: 1px solid var(--line-soft); background: #111318; overflow: hidden; }
+.timeline-ruler::before {
+  content: ""; position: absolute; inset: 0;
+  background: repeating-linear-gradient(to right, #313640 0 1px, transparent 1px 80px),
+              repeating-linear-gradient(to right, #222730 0 1px, transparent 1px 20px);
+}
+.playhead { position: absolute; top: 0; bottom: 0; left: 0; width: 2px; background: #d6d9df; box-shadow: 0 0 0 1px #0006; }
+#timelineList { overflow: auto; min-height: 0; flex: 1; padding: 4px 6px 8px; }
+.lane-row { height: 26px; margin-bottom: 3px; padding: 0 6px; }
+.lane-row .mvbtn { padding: 1px 5px; font-size: 10px; line-height: 1.1; }
+.lane-track { position: relative; flex: 0 0 42%; height: 12px; background: #101318; border: 1px solid #242935; border-radius: 2px; overflow: hidden; }
+.lane-bar { position: absolute; inset: 1px; border-radius: 1px; background: linear-gradient(90deg, #4c6fb7, #a56a5f); opacity: .9; }
+.lane-row:not(.on) .lane-bar { display: none; }
 
 .recRing { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #d44; margin-right: 4px; vertical-align: middle; animation: blink 1s infinite; }
 @keyframes blink { 50% { opacity: 0.3; } }
 
-#fpsInfo { font-family: ui-monospace, Consolas, monospace; }
+#fpsInfo { font-family: ui-monospace, Consolas, monospace; color: #aeb6c5; }
 .note { font-size: 10px; color: #6a7180; margin-top: 4px; line-height: 1.4; }
-hr { border: 0; border-top: 1px solid #23262d; margin: 8px 0; }
+hr { border: 0; border-top: 1px solid var(--line-soft); margin: 8px 0; }
 </style>
 </head>
 <body>
 <div id="app">
 
-<aside id="left">
-  <div class="section">
-    <h3>素材</h3>
-    <input type="file" id="fileInput" accept="image/*,video/*">
-    <div class="row" style="margin-top:6px;">
-      <button id="useDemo">デモ映像</button>
-      <button id="playPause">再生/停止</button>
-    </div>
+<header id="topbar">
+  <div class="brand">VJ FX Maker</div>
+  <div class="top-group">
+    <span class="top-label">BPM</span>
+    <input type="number" id="bpmInput" min="20" max="300" step="0.5" value="120">
+    <button id="tapBpm">tap</button>
+    <input type="range" id="beatBar" min="0" max="1" step="0.001" value="0" disabled>
   </div>
-
-  <div class="section">
-    <h3>解像度</h3>
-    <div class="row">
-      <label>scale</label>
-      <input type="range" id="resScale" min="0.25" max="1" step="0.05" value="1">
-      <span class="v" id="resScaleV">1.00</span>
-    </div>
-    <div class="note">重い場合は下げる</div>
-  </div>
-
-  <div class="section">
-    <h3>BPM</h3>
-    <div class="row">
-      <label>BPM</label>
-      <input type="number" id="bpmInput" min="20" max="300" step="0.5" value="120">
-      <button id="tapBpm">tap</button>
-    </div>
-    <div class="row">
-      <label>位相</label>
-      <input type="range" id="beatBar" min="0" max="1" step="0.001" value="0" disabled>
-    </div>
-  </div>
-
-  <div class="section">
-    <h3>音声</h3>
-    <div class="toolbar">
-      <button id="micBtn">マイク</button>
-    </div>
-    <input type="file" id="audioFile" accept="audio/*" style="margin-top:6px;">
-    <div class="row">
-      <label>level</label>
-      <input type="range" id="audioBar" min="0" max="1" step="0.001" value="0" disabled>
-    </div>
-    <div class="row">
-      <label>感度</label>
-      <input type="range" id="audioGain" min="0.5" max="6" step="0.1" value="2">
-      <span class="v" id="audioGainV">2.0</span>
-    </div>
-  </div>
-
-  <div class="section">
-    <h3>プリセット</h3>
-    <div class="toolbar">
-      <button id="presetSave">保存</button>
-      <button id="presetLoad">読込</button>
-      <button id="presetRand" class="primary">ランダム</button>
-      <button id="presetClear">クリア</button>
-    </div>
+  <div class="top-group grow">
+    <button id="presetSave">保存</button>
+    <button id="presetLoad">読込</button>
+    <button id="presetRand" class="primary">ランダム</button>
+    <button id="presetClear">クリア</button>
     <input type="file" id="presetFile" accept="application/json" style="display:none;">
   </div>
-
-  <div class="section">
-    <h3>録画 / 出力</h3>
-    <div class="toolbar">
-      <button id="recBtn">● 録画</button>
-      <button id="snapBtn">PNG</button>
-    </div>
-    <div id="recInfo" style="margin-top:5px; color:#888f9d; font-size:11px;">stop</div>
+  <div class="top-group">
+    <span id="timecode">00:00.0</span>
+    <button id="recBtn">● 録画</button>
+    <button id="snapBtn">PNG</button>
+    <button id="fsBtn">全画面</button>
+    <button id="hidePanelBtn">パネル隠す</button>
   </div>
+</header>
 
-  <div class="section">
-    <h3>表示</h3>
-    <div class="toolbar">
-      <button id="fsBtn">全画面</button>
-      <button id="hidePanelBtn">パネル隠す</button>
-    </div>
+<aside id="left">
+  <div class="panel-head">
+    <div class="panel-title">Library</div>
+    <div id="fxStatus"></div>
   </div>
+  <div class="panel-scroll">
+    <div class="section">
+      <h3>素材</h3>
+      <input type="file" id="fileInput" accept="image/*,video/*">
+      <div class="row" style="margin-top:6px;">
+        <button id="useDemo">デモ映像</button>
+        <button id="playPause">再生/停止</button>
+      </div>
+    </div>
 
-  <div class="section">
-    <h3>情報</h3>
-    <div id="fpsInfo">FPS -</div>
+    <div class="section">
+      <h3>解像度</h3>
+      <div class="row">
+        <label>scale</label>
+        <input type="range" id="resScale" min="0.25" max="1" step="0.05" value="1">
+        <span class="v" id="resScaleV">1.00</span>
+      </div>
+      <div class="note">重い場合は下げる</div>
+    </div>
+
+    <div class="section">
+      <h3>音声</h3>
+      <div class="toolbar">
+        <button id="micBtn">マイク</button>
+      </div>
+      <input type="file" id="audioFile" accept="audio/*" style="margin-top:6px;">
+      <div class="row">
+        <label>level</label>
+        <input type="range" id="audioBar" min="0" max="1" step="0.001" value="0" disabled>
+      </div>
+      <div class="row">
+        <label>感度</label>
+        <input type="range" id="audioGain" min="0.5" max="6" step="0.1" value="2">
+        <span class="v" id="audioGainV">2.0</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>エフェクト</h3>
+      <div class="toolbar" style="margin-bottom:8px;">
+        <button id="fxAllOff">全OFF</button>
+        <button id="fxExpandAll">全展開</button>
+        <button id="fxCollapseAll">全折畳</button>
+      </div>
+      <div id="effectList"></div>
+    </div>
   </div>
 </aside>
+
+<div class="panel-resizer" id="resizeLeft"></div>
 
 <main id="center">
   <div id="viewWrap"><canvas id="view" width="1280" height="720"></canvas></div>
   <div id="hud"></div>
 </main>
 
+<div class="panel-resizer" id="resizeRight"></div>
+
 <aside id="right">
-  <div id="fxStatus"></div>
-  <div class="toolbar" style="margin-bottom:8px;">
-    <button id="fxAllOff">全OFF</button>
-    <button id="fxExpandAll">全展開</button>
-    <button id="fxCollapseAll">全折畳</button>
+  <div class="panel-head">
+    <div class="panel-title">Controls</div>
+    <div id="fpsInfo">FPS -</div>
   </div>
-  <div id="effectList"></div>
+  <div class="panel-scroll" id="selectedPanel"></div>
 </aside>
+
+<div class="panel-resizer" id="resizeBottom"></div>
+
+<section id="bottom">
+  <div class="panel-head">
+    <div class="panel-title">Timeline</div>
+    <div id="timelineSummary"></div>
+    <div id="recInfo" style="color:#888f9d; font-size:11px;">stop</div>
+  </div>
+  <div class="timeline-ruler"><div class="playhead" id="playhead"></div></div>
+  <div id="timelineList"></div>
+</section>
 
 </div>
 
@@ -826,27 +906,39 @@ const EFFECTS = [
  extras:[]},
 // 50
 {id:'audiobpm', name:'50 BPM / 音量連動', st:'mon',
- def:{amount:1, mix:1},
- frag:`gl_FragColor = texture2D(u_tex, v_uv);`,
- extras:[]}
+  def:{amount:1, mix:1},
+  frag:`gl_FragColor = texture2D(u_tex, v_uv);`,
+  extras:[]}
 ];
+
+const EFFECT_CATEGORIES = [
+  {key:'Transform', ids:['zoom','pan','crop','rotate','mirror','tile','kaleido','split','pip','wrapscroll']},
+  {key:'Color', ids:['hue','sat','contrast','bright','gamma','invert','mono','gradmap','poster','lut']},
+  {key:'Light', ids:['glow','edgeglow','bloom','flare','leak','vignette','strobe','flash']},
+  {key:'Blur', ids:['gblur','mblur','rblur','zblur']},
+  {key:'Distort', ids:['wave','lensd','swirl','noisedisp','liquify','shake']},
+  {key:'Glitch', ids:['rgbshift','chroma','glitch','slice','block','pixel','scan','grain','vhs']},
+  {key:'Time', ids:['trail','feedback','audiobpm']}
+];
+const EFFECT_CATEGORY_BY_ID = {};
+EFFECT_CATEGORIES.forEach(cat => cat.ids.forEach(id => { EFFECT_CATEGORY_BY_ID[id] = cat.key; }));
+EFFECTS.forEach(e => { e.cat = EFFECT_CATEGORY_BY_ID[e.id] || 'Other'; });
 
 // ===================================================================
 // STATE
 // ===================================================================
 const state = {
   source: { kind: 'demo', media: null, image: null, dirty: true },
-  effects: EFFECTS.map(e => {
-    const v = { amount: 0.5, speed: 0.5, mix: 1, bpmSync: 0, audioReactive: 0 };
-    if (e.def) Object.assign(v, e.def);
-    if (e.extras) e.extras.forEach(x => v[x.key] = x.def);
-    return { id: e.id, enabled: false, open: false, values: v };
-  }),
+  layers: [],
+  nextLayerSeq: 1,
   bpm: 120,
   beatStart: performance.now() / 1000,
   beatPhase: 0,
   audio: { ctx: null, analyser: null, level: 0, gain: 2, source: null, kind: null },
   resScale: 1,
+  selectedLayerId: null,
+  categoriesOpen: Object.fromEntries(EFFECT_CATEGORIES.map(cat => [cat.key, true])),
+  panels: { leftW: 280, rightW: 330, bottomH: 210 },
   recording: false,
   recorder: null,
   recChunks: [],
@@ -1038,8 +1130,8 @@ function drawQuad() {
 let frameCount = 0, lastFps = performance.now(), curFps = 0;
 let startTime = performance.now() / 1000;
 
-function effectiveAmount(eff) {
-  const v = eff.values;
+function effectiveAmount(layer) {
+  const v = layer.values;
   let amt = v.amount;
   if (v.bpmSync) amt += v.bpmSync * 0.5 * Math.sin(state.beatPhase * Math.PI * 2);
   if (v.audioReactive) amt += v.audioReactive * 0.5 * state.audio.level;
@@ -1056,7 +1148,7 @@ function render() {
   uploadSource();
 
   // pipeline
-  const enabled = state.effects.filter(e => e.enabled);
+  const enabled = state.layers.filter(layer => layer.enabled);
   const W = canvas.width, H = canvas.height;
   ensureFBOs(W, H);
 
@@ -1064,8 +1156,8 @@ function render() {
   let target = fboA, alt = fboB;
   let didPass = false;
 
-  for (const eff of enabled) {
-    const def = EFFECTS.find(d => d.id === eff.id);
+  for (const layer of enabled) {
+    const def = EFFECTS.find(d => d.id === layer.effId);
     if (!def || def.st === 'mon') continue;
     const prog = getProg(def);
     if (!prog) continue;
@@ -1086,9 +1178,9 @@ function render() {
     gl.uniform1f(prog.u.u_beat, state.beatPhase);
     gl.uniform1f(prog.u.u_audio, state.audio.level);
 
-    gl.uniform1f(prog.u.u_amount, effectiveAmount(eff));
-    gl.uniform1f(prog.u.u_speed, eff.values.speed);
-    gl.uniform1f(prog.u.u_mix, eff.values.mix);
+    gl.uniform1f(prog.u.u_amount, effectiveAmount(layer));
+    gl.uniform1f(prog.u.u_speed, layer.values.speed);
+    gl.uniform1f(prog.u.u_mix, layer.values.mix);
 
     // map first 4 extras to p1..p4 (color extras get separate slot)
     const ps = [0,0,0,0];
@@ -1097,10 +1189,10 @@ function render() {
     if (def.extras) {
       for (const x of def.extras) {
         if (x.type === 'color') {
-          if (x.key === 'cA' || x.key === 'colorA') cA = hexToVec3(eff.values[x.key]);
-          else if (x.key === 'cB' || x.key === 'colorB') cB = hexToVec3(eff.values[x.key]);
+          if (x.key === 'cA' || x.key === 'colorA') cA = hexToVec3(layer.values[x.key]);
+          else if (x.key === 'cB' || x.key === 'colorB') cB = hexToVec3(layer.values[x.key]);
         } else {
-          if (pi < 4) ps[pi++] = eff.values[x.key];
+          if (pi < 4) ps[pi++] = layer.values[x.key];
         }
       }
     }
@@ -1143,7 +1235,7 @@ function render() {
     frameCount = 0;
     lastFps = now * 1000;
     document.getElementById('fpsInfo').textContent =
-      `FPS ${curFps}  ${canvas.width}x${canvas.height}  passes:${enabled.filter(e=>{const d=EFFECTS.find(D=>D.id===e.id);return d&&d.st!=='mon';}).length}`;
+      `FPS ${curFps}  ${canvas.width}x${canvas.height}  passes:${enabled.filter(layer=>{const d=EFFECTS.find(D=>D.id===layer.effId);return d&&d.st!=='mon';}).length}`;
   }
 
   // HUD
@@ -1153,6 +1245,11 @@ function render() {
     `<span class="k">audio</span> <span class="v">${state.audio.level.toFixed(2)}</span>`;
   document.getElementById('beatBar').value = state.beatPhase;
   document.getElementById('audioBar').value = Math.min(1, state.audio.level);
+  const minutes = Math.floor(t / 60);
+  const seconds = t % 60;
+  document.getElementById('timecode').textContent =
+    `${String(minutes).padStart(2,'0')}:${seconds.toFixed(1).padStart(4,'0')}`;
+  document.getElementById('playhead').style.left = (state.beatPhase * 100).toFixed(2) + '%';
 
   requestAnimationFrame(render);
 }
@@ -1300,60 +1397,225 @@ function pollAudio() {
 // UI: EFFECT LIST
 // ===================================================================
 const effectList = document.getElementById('effectList');
-function buildEffectList() {
+const selectedPanel = document.getElementById('selectedPanel');
+const timelineList = document.getElementById('timelineList');
+
+function effectDef(id) {
+  return EFFECTS.find(d => d.id === id);
+}
+function layerState(lid) {
+  return state.layers.find(layer => layer.lid === lid);
+}
+function statusLabel(st) {
+  return st === 'full' ? '実装' : st === 'lite' ? '簡易' : '監視';
+}
+function defaultValuesFor(def) {
+  const values = { amount: 0.5, speed: 0.5, mix: 1, bpmSync: 0, audioReactive: 0 };
+  if (def.def) Object.assign(values, def.def);
+  if (def.extras) def.extras.forEach(x => values[x.key] = x.def);
+  return values;
+}
+function createLayer(effId, opts = {}) {
+  const def = effectDef(effId);
+  if (!def) return null;
+  const layer = {
+    lid: opts.lid || `L${state.nextLayerSeq++}`,
+    effId,
+    enabled: !!opts.enabled,
+    values: defaultValuesFor(def),
+    keyframes: {}
+  };
+  Object.assign(layer.values, opts.values || {});
+  return layer;
+}
+function ensureSelectedLayer() {
+  if (!layerState(state.selectedLayerId)) {
+    state.selectedLayerId = state.layers[0] ? state.layers[0].lid : null;
+  }
+}
+function selectLayer(lid) {
+  state.selectedLayerId = lid;
+  refreshFxUI();
+}
+function addLayer(effId) {
+  const def = effectDef(effId);
+  const layer = createLayer(effId, {enabled: true});
+  if (!layer || !def) return;
+  state.layers.push(layer);
+  state.selectedLayerId = layer.lid;
+  if (def.st !== 'mon') getProg(def);
+  refreshFxUI();
+}
+function duplicateLayer(lid) {
+  const src = layerState(lid);
+  if (!src) return;
+  const copy = createLayer(src.effId, {enabled: src.enabled, values: {...src.values}});
+  if (!copy) return;
+  const idx = state.layers.findIndex(layer => layer.lid === lid);
+  state.layers.splice(idx + 1, 0, copy);
+  state.selectedLayerId = copy.lid;
+  refreshFxUI();
+}
+function deleteLayer(lid) {
+  const idx = state.layers.findIndex(layer => layer.lid === lid);
+  if (idx < 0) return;
+  state.layers.splice(idx, 1);
+  state.selectedLayerId = state.layers[Math.min(idx, state.layers.length - 1)]?.lid || null;
+  refreshFxUI();
+}
+function moveLayer(lid, delta) {
+  const idx = state.layers.findIndex(layer => layer.lid === lid);
+  const next = idx + delta;
+  if (idx < 0 || next < 0 || next >= state.layers.length) return;
+  [state.layers[idx], state.layers[next]] = [state.layers[next], state.layers[idx]];
+  refreshFxUI();
+}
+function toggleLayer(lid, enabled) {
+  const layer = layerState(lid);
+  const def = layer && effectDef(layer.effId);
+  if (!layer || !def) return;
+  layer.enabled = enabled;
+  if (layer.enabled && def.st !== 'mon') getProg(def);
+  state.selectedLayerId = lid;
+  refreshFxUI();
+}
+function refreshFxUI() {
+  ensureSelectedLayer();
   effectList.innerHTML = '';
-  state.effects.forEach((eff, idx) => {
-    const def = EFFECTS.find(d => d.id === eff.id);
-    const card = document.createElement('div');
-    card.className = 'fx' + (eff.enabled ? ' on' : '') + (eff.open ? ' open' : '');
-    const stCls = def.st;
-    const stLabel = def.st === 'full' ? '実装' : def.st === 'lite' ? '簡易' : '監視';
-    card.innerHTML = `
-      <div class="fx-head">
-        <span class="num">${(idx+1).toString().padStart(2,'0')}</span>
-        <input type="checkbox" ${eff.enabled?'checked':''} data-act="toggle">
-        <span class="name">${def.name}</span>
-        <span class="badge ${stCls}">${stLabel}</span>
-        <button class="mvbtn" data-act="up">▲</button>
-        <button class="mvbtn" data-act="down">▼</button>
-      </div>
-      <div class="fx-body"></div>
-    `;
-    const head = card.querySelector('.fx-head');
-    head.querySelector('.name').addEventListener('click', () => {
-      eff.open = !eff.open;
-      card.classList.toggle('open', eff.open);
-      if (eff.open && !card.querySelector('.fx-body').children.length)
-        buildEffectBody(card.querySelector('.fx-body'), eff, def);
-    });
-    head.querySelector('[data-act=toggle]').addEventListener('change', e => {
-      eff.enabled = e.target.checked;
-      card.classList.toggle('on', eff.enabled);
-      // pre-compile shader
-      if (eff.enabled && def.st !== 'mon') getProg(def);
-      updateFxStatus();
-    });
-    head.querySelector('[data-act=up]').addEventListener('click', e => {
-      e.stopPropagation();
-      if (idx > 0) {
-        [state.effects[idx-1], state.effects[idx]] = [state.effects[idx], state.effects[idx-1]];
-        buildEffectList();
-      }
-    });
-    head.querySelector('[data-act=down]').addEventListener('click', e => {
-      e.stopPropagation();
-      if (idx < state.effects.length-1) {
-        [state.effects[idx+1], state.effects[idx]] = [state.effects[idx], state.effects[idx+1]];
-        buildEffectList();
-      }
-    });
-    if (eff.open) buildEffectBody(card.querySelector('.fx-body'), eff, def);
-    effectList.appendChild(card);
-  });
+  buildEffectList();
+  buildInspector();
+  buildTimeline();
   updateFxStatus();
 }
 
-function buildEffectBody(body, eff, def) {
+function buildEffectList() {
+  EFFECT_CATEGORIES.forEach(cat => {
+    const box = document.createElement('div');
+    box.className = 'category' + (state.categoriesOpen[cat.key] ? '' : ' closed');
+    const layerCount = state.layers.filter(layer => effectDef(layer.effId)?.cat === cat.key).length;
+    const onCount = state.layers.filter(layer => layer.enabled && effectDef(layer.effId)?.cat === cat.key).length;
+    box.innerHTML = `
+      <button class="category-head">
+        <span class="twisty">${state.categoriesOpen[cat.key] ? '▼' : '▶'}</span>
+        <span class="cat-name">${cat.key}</span>
+        <span class="cat-count">${onCount}/${layerCount}</span>
+      </button>
+      <div class="category-body"></div>
+    `;
+    box.querySelector('.category-head').addEventListener('click', () => {
+      state.categoriesOpen[cat.key] = !state.categoriesOpen[cat.key];
+      refreshFxUI();
+    });
+    const body = box.querySelector('.category-body');
+    cat.ids.forEach(id => {
+      const def = effectDef(id);
+      if (!def) return;
+      const related = state.layers.filter(layer => layer.effId === id);
+      const selected = related.some(layer => layer.lid === state.selectedLayerId);
+      const enabled = related.some(layer => layer.enabled);
+      const row = document.createElement('div');
+      row.className = 'lib-row' +
+        (enabled ? ' on' : '') +
+        (selected ? ' selected' : '');
+      row.innerHTML = `
+        <span class="num">${String(related.length).padStart(2,'0')}</span>
+        <span class="lib-name">${def.name}</span>
+        <span class="badge ${def.st}">${statusLabel(def.st)}</span>
+        <button class="mvbtn" data-act="add">＋</button>
+      `;
+      row.addEventListener('click', () => {
+        const first = related[0];
+        if (first) selectLayer(first.lid);
+        else addLayer(id);
+      });
+      row.querySelector('[data-act=add]').addEventListener('click', e => {
+        e.stopPropagation();
+        addLayer(id);
+      });
+      body.appendChild(row);
+    });
+    effectList.appendChild(box);
+  });
+}
+
+function buildInspector() {
+  selectedPanel.innerHTML = '';
+  const layer = layerState(state.selectedLayerId);
+  const def = layer && effectDef(layer.effId);
+  if (!layer || !def) {
+    selectedPanel.innerHTML = '<div class="empty">左のライブラリから効果を追加してください。</div>';
+    return;
+  }
+  const idx = state.layers.findIndex(item => item.lid === layer.lid);
+  const head = document.createElement('div');
+  head.innerHTML = `
+    <div class="selected-title">
+      <span class="num">${String(idx + 1).padStart(2,'0')}</span>
+      <h2>${def.name}</h2>
+      <span class="badge">${layer.lid}</span>
+      <span class="badge ${def.st}">${statusLabel(def.st)}</span>
+    </div>
+    <div class="selected-actions">
+      <label class="row" style="margin:0;">
+        <input type="checkbox" id="selectedEnabled" ${layer.enabled?'checked':''}> 有効
+      </label>
+      <button data-act="up">▲ 上へ</button>
+      <button data-act="down">▼ 下へ</button>
+      <button data-act="duplicate">複製</button>
+      <button class="danger" data-act="delete">削除</button>
+    </div>
+  `;
+  selectedPanel.appendChild(head);
+  head.querySelector('#selectedEnabled').addEventListener('change', e => toggleLayer(layer.lid, e.target.checked));
+  head.querySelector('[data-act=up]').addEventListener('click', () => moveLayer(layer.lid, -1));
+  head.querySelector('[data-act=down]').addEventListener('click', () => moveLayer(layer.lid, 1));
+  head.querySelector('[data-act=duplicate]').addEventListener('click', () => duplicateLayer(layer.lid));
+  head.querySelector('[data-act=delete]').addEventListener('click', () => deleteLayer(layer.lid));
+
+  const body = document.createElement('div');
+  body.className = 'fx-body';
+  buildEffectBody(body, layer, def);
+  selectedPanel.appendChild(body);
+}
+
+function buildTimeline() {
+  timelineList.innerHTML = '';
+  if (!state.layers.length) {
+    timelineList.innerHTML = '<div class="empty">レイヤーはまだありません。左パネルの＋で追加します。</div>';
+    return;
+  }
+  state.layers.forEach((layer, idx) => {
+    const def = effectDef(layer.effId);
+    if (!def) return;
+    const row = document.createElement('div');
+    row.className = 'lane-row' +
+      (layer.enabled ? ' on' : '') +
+      (state.selectedLayerId === layer.lid ? ' selected' : '');
+    row.innerHTML = `
+      <span class="num">${String(idx + 1).padStart(2,'0')}</span>
+      <input type="checkbox" ${layer.enabled?'checked':''} aria-label="${def.name} 有効">
+      <span class="lane-name">${def.name}</span>
+      <button class="mvbtn" data-act="up">▲</button>
+      <button class="mvbtn" data-act="down">▼</button>
+      <div class="lane-track"><div class="lane-bar"></div></div>
+    `;
+    row.addEventListener('click', () => selectLayer(layer.lid));
+    const chk = row.querySelector('input');
+    chk.addEventListener('click', e => e.stopPropagation());
+    chk.addEventListener('change', e => toggleLayer(layer.lid, e.target.checked));
+    row.querySelector('[data-act=up]').addEventListener('click', e => {
+      e.stopPropagation();
+      moveLayer(layer.lid, -1);
+    });
+    row.querySelector('[data-act=down]').addEventListener('click', e => {
+      e.stopPropagation();
+      moveLayer(layer.lid, 1);
+    });
+    timelineList.appendChild(row);
+  });
+}
+
+function buildEffectBody(body, layer, def) {
   body.innerHTML = '';
   const baseParams = [
     {key:'amount',  label:'amount',  min:0, max:1, step:0.001},
@@ -1362,12 +1624,12 @@ function buildEffectBody(body, eff, def) {
     {key:'bpmSync', label:'bpmSync', min:0, max:1, step:0.001},
     {key:'audioReactive', label:'audio', min:0, max:1, step:0.001},
   ];
-  baseParams.forEach(p => body.appendChild(makeRange(eff, p)));
+  baseParams.forEach(p => body.appendChild(makeRange(layer, p)));
   if (def.extras && def.extras.length) {
     const hr = document.createElement('hr'); body.appendChild(hr);
     def.extras.forEach(x => {
-      if (x.type === 'color') body.appendChild(makeColor(eff, x));
-      else body.appendChild(makeRange(eff, {key:x.key, label:x.label, min:x.min, max:x.max, step:0.001}));
+      if (x.type === 'color') body.appendChild(makeColor(layer, x));
+      else body.appendChild(makeRange(layer, {key:x.key, label:x.label, min:x.min, max:x.max, step:0.001}));
     });
   }
   if (def.id === 'audiobpm') {
@@ -1378,56 +1640,57 @@ function buildEffectBody(body, eff, def) {
   }
 }
 
-function makeRange(eff, p) {
+function makeRange(layer, p) {
   const row = document.createElement('div');
   row.className = 'row';
   const lab = document.createElement('label'); lab.textContent = p.label;
   const inp = document.createElement('input');
   inp.type = 'range'; inp.min = p.min; inp.max = p.max; inp.step = p.step || 0.01;
-  inp.value = eff.values[p.key] ?? 0;
+  inp.value = layer.values[p.key] ?? 0;
   const v = document.createElement('span'); v.className = 'v';
   v.textContent = (+inp.value).toFixed(2);
   inp.addEventListener('input', () => {
-    eff.values[p.key] = parseFloat(inp.value);
+    layer.values[p.key] = parseFloat(inp.value);
     v.textContent = parseFloat(inp.value).toFixed(2);
   });
   row.appendChild(lab); row.appendChild(inp); row.appendChild(v);
   return row;
 }
-function makeColor(eff, x) {
+function makeColor(layer, x) {
   const row = document.createElement('div');
   row.className = 'row';
   const lab = document.createElement('label'); lab.textContent = x.label;
   const inp = document.createElement('input');
-  inp.type = 'color'; inp.value = eff.values[x.key] || x.def;
-  inp.addEventListener('input', () => { eff.values[x.key] = inp.value; });
+  inp.type = 'color'; inp.value = layer.values[x.key] || x.def;
+  inp.addEventListener('input', () => { layer.values[x.key] = inp.value; });
   row.appendChild(lab); row.appendChild(inp);
   return row;
 }
 
 function updateFxStatus() {
-  const total = state.effects.length;
-  const on = state.effects.filter(e => e.enabled).length;
+  const total = state.layers.length;
+  const on = state.layers.filter(layer => layer.enabled).length;
   const full = EFFECTS.filter(e => e.st === 'full').length;
   const lite = EFFECTS.filter(e => e.st === 'lite').length;
   const mon  = EFFECTS.filter(e => e.st === 'mon').length;
-  document.getElementById('fxStatus').innerHTML =
-    `<b>${on}</b> / ${total} 有効 &nbsp; <span style="color:#88d8a3">実装 ${full}</span> ` +
+  document.getElementById('fxStatus').innerHTML = `<b>${on}</b> / ${total}`;
+  document.getElementById('timelineSummary').innerHTML =
+    `${on} / ${total} レイヤー / <span style="color:#88d8a3">実装 ${full}</span> ` +
     `<span style="color:#d8c188">簡易 ${lite}</span> ` +
     `<span style="color:#88b3d8">監視 ${mon}</span>`;
 }
 
 document.getElementById('fxAllOff').addEventListener('click', () => {
-  state.effects.forEach(e => e.enabled = false);
-  buildEffectList();
+  state.layers.forEach(layer => layer.enabled = false);
+  refreshFxUI();
 });
 document.getElementById('fxExpandAll').addEventListener('click', () => {
-  state.effects.forEach(e => e.open = true);
-  buildEffectList();
+  EFFECT_CATEGORIES.forEach(cat => state.categoriesOpen[cat.key] = true);
+  refreshFxUI();
 });
 document.getElementById('fxCollapseAll').addEventListener('click', () => {
-  state.effects.forEach(e => e.open = false);
-  buildEffectList();
+  EFFECT_CATEGORIES.forEach(cat => state.categoriesOpen[cat.key] = false);
+  refreshFxUI();
 });
 
 // ===================================================================
@@ -1435,9 +1698,14 @@ document.getElementById('fxCollapseAll').addEventListener('click', () => {
 // ===================================================================
 function exportPreset() {
   const data = {
-    version: 1,
+    version: 2,
     bpm: state.bpm,
-    effects: state.effects.map(e => ({ id: e.id, enabled: e.enabled, values: {...e.values} }))
+    layers: state.layers.map(layer => ({
+      effId: layer.effId,
+      enabled: layer.enabled,
+      values: {...layer.values},
+      keyframes: layer.keyframes || {}
+    }))
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
   const a = document.createElement('a');
@@ -1451,20 +1719,25 @@ function importPreset(file) {
     try {
       const data = JSON.parse(r.result);
       if (data.bpm) { state.bpm = data.bpm; bpmInput.value = data.bpm; }
-      if (data.effects) {
-        const order = [];
-        data.effects.forEach(p => {
-          const i = state.effects.findIndex(e => e.id === p.id);
-          if (i >= 0) {
-            state.effects[i].enabled = !!p.enabled;
-            Object.assign(state.effects[i].values, p.values || {});
-            order.push(state.effects.splice(i, 1)[0]);
-          }
+      const hasLayerData = Array.isArray(data.layers) || Array.isArray(data.effects);
+      const incoming = data.layers || data.effects || [];
+      if (hasLayerData) {
+        const fromV1 = !Array.isArray(data.layers);
+        state.layers = [];
+        incoming.forEach(p => {
+          const effId = p.effId || p.id;
+          if (fromV1 && !p.enabled) return;
+          const layer = createLayer(effId, {
+            enabled: !!p.enabled,
+            values: p.values || {}
+          });
+          if (!layer) return;
+          layer.keyframes = p.keyframes || {};
+          state.layers.push(layer);
         });
-        // append remaining (any not in preset)
-        state.effects = order.concat(state.effects);
+        state.selectedLayerId = state.layers[0]?.lid || null;
       }
-      buildEffectList();
+      refreshFxUI();
     } catch (e) { alert('プリセット読込失敗: ' + e.message); }
   };
   r.readAsText(file);
@@ -1476,44 +1749,38 @@ document.getElementById('presetFile').addEventListener('change', e => {
   if (e.target.files[0]) importPreset(e.target.files[0]);
 });
 document.getElementById('presetClear').addEventListener('click', () => {
-  state.effects.forEach(e => {
-    e.enabled = false;
-    const def = EFFECTS.find(d => d.id === e.id);
-    e.values = { amount:0.5, speed:0.5, mix:1, bpmSync:0, audioReactive:0 };
-    if (def.def) Object.assign(e.values, def.def);
-    if (def.extras) def.extras.forEach(x => e.values[x.key] = x.def);
-  });
-  buildEffectList();
+  state.layers = [];
+  state.selectedLayerId = null;
+  refreshFxUI();
 });
 document.getElementById('presetRand').addEventListener('click', () => {
-  state.effects.forEach(e => e.enabled = false);
+  state.layers = [];
   // pick 3-7 effects randomly
-  const candidates = state.effects.filter(e => {
-    const d = EFFECTS.find(D => D.id === e.id);
-    return d && d.st !== 'mon';
-  });
+  const candidates = EFFECTS.filter(def => def.st !== 'mon');
   const n = 3 + Math.floor(Math.random() * 5);
   for (let i = candidates.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i+1));
     [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
   }
-  candidates.slice(0, n).forEach(e => {
-    e.enabled = true;
-    e.values.amount = 0.2 + Math.random() * 0.7;
-    e.values.speed  = Math.random();
-    e.values.mix    = 0.5 + Math.random() * 0.5;
-    e.values.bpmSync = Math.random() < 0.4 ? Math.random() * 0.6 : 0;
-    e.values.audioReactive = Math.random() < 0.4 ? Math.random() * 0.6 : 0;
-    const def = EFFECTS.find(d => d.id === e.id);
+  candidates.slice(0, n).forEach(def => {
+    const layer = createLayer(def.id, {enabled: true});
+    if (!layer) return;
+    layer.values.amount = 0.2 + Math.random() * 0.7;
+    layer.values.speed  = Math.random();
+    layer.values.mix    = 0.5 + Math.random() * 0.5;
+    layer.values.bpmSync = Math.random() < 0.4 ? Math.random() * 0.6 : 0;
+    layer.values.audioReactive = Math.random() < 0.4 ? Math.random() * 0.6 : 0;
     if (def.extras) def.extras.forEach(x => {
       if (x.type === 'color') {
-        e.values[x.key] = '#' + Math.floor(Math.random()*0xffffff).toString(16).padStart(6,'0');
+        layer.values[x.key] = '#' + Math.floor(Math.random()*0xffffff).toString(16).padStart(6,'0');
       } else {
-        e.values[x.key] = x.min + Math.random() * (x.max - x.min);
+        layer.values[x.key] = x.min + Math.random() * (x.max - x.min);
       }
     });
+    state.layers.push(layer);
   });
-  buildEffectList();
+  state.selectedLayerId = state.layers[0]?.lid || null;
+  refreshFxUI();
 });
 
 // ===================================================================
@@ -1611,9 +1878,67 @@ document.getElementById('resScale').addEventListener('input', e => {
 });
 
 // ===================================================================
+// PANEL RESIZE
+// ===================================================================
+function clamp(v, min, max) {
+  return Math.max(min, Math.min(max, v));
+}
+function applyPanelSizes() {
+  const app = document.getElementById('app');
+  app.style.setProperty('--left-w', state.panels.leftW + 'px');
+  app.style.setProperty('--right-w', state.panels.rightW + 'px');
+  app.style.setProperty('--bottom-h', state.panels.bottomH + 'px');
+  resizeCanvas();
+}
+function setupPanelResize() {
+  let drag = null;
+  const start = (kind, e) => {
+    e.preventDefault();
+    drag = {
+      kind,
+      x: e.clientX,
+      y: e.clientY,
+      leftW: state.panels.leftW,
+      rightW: state.panels.rightW,
+      bottomH: state.panels.bottomH
+    };
+    document.body.classList.add('is-resizing');
+    document.body.style.cursor = kind === 'bottom' ? 'row-resize' : 'col-resize';
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', end, {once:true});
+  };
+  const move = e => {
+    if (!drag) return;
+    const minCenter = 360;
+    if (drag.kind === 'left') {
+      const max = Math.max(220, window.innerWidth - state.panels.rightW - minCenter);
+      state.panels.leftW = clamp(drag.leftW + e.clientX - drag.x, 220, Math.min(460, max));
+    } else if (drag.kind === 'right') {
+      const max = Math.max(260, window.innerWidth - state.panels.leftW - minCenter);
+      state.panels.rightW = clamp(drag.rightW - (e.clientX - drag.x), 260, Math.min(540, max));
+    } else {
+      const max = Math.max(130, window.innerHeight - 220);
+      state.panels.bottomH = clamp(drag.bottomH - (e.clientY - drag.y), 130, Math.min(420, max));
+    }
+    applyPanelSizes();
+  };
+  const end = () => {
+    drag = null;
+    document.body.classList.remove('is-resizing');
+    document.body.style.cursor = '';
+    window.removeEventListener('pointermove', move);
+  };
+  document.getElementById('resizeLeft').addEventListener('pointerdown', e => start('left', e));
+  document.getElementById('resizeRight').addEventListener('pointerdown', e => start('right', e));
+  document.getElementById('resizeBottom').addEventListener('pointerdown', e => start('bottom', e));
+}
+
+// ===================================================================
 // INIT
 // ===================================================================
-buildEffectList();
+applyPanelSizes();
+setupPanelResize();
+refreshFxUI();
 resizeCanvas();
 requestAnimationFrame(render);
 requestAnimationFrame(pollAudio);
