@@ -1875,6 +1875,31 @@ function pasteKeyClipboard() {
   state.selectedKey = {lid: layer.lid, paramKey, idx};
   refreshFxUI();
 }
+function randomParamValue(param) {
+  if (param.type === 'color') {
+    return '#' + Math.floor(Math.random()*0xffffff).toString(16).padStart(6,'0');
+  }
+  const min = param.min ?? 0;
+  const max = param.max ?? 1;
+  return min + Math.random() * (max - min);
+}
+function randomizeLayerKeyframes(layer, def) {
+  const params = paramDefsFor(def).filter(p => p.type !== 'color');
+  const count = 2 + Math.floor(Math.random() * 3);
+  const chosen = params
+    .sort(() => Math.random() - 0.5)
+    .slice(0, Math.min(params.length, 2 + Math.floor(Math.random() * 3)));
+  chosen.forEach(param => {
+    layer.keyframes[param.key] = [];
+    for (let i = 0; i < count; i++) {
+      layer.keyframes[param.key].push({
+        t: Math.random() * state.comp.duration,
+        v: randomParamValue(param)
+      });
+    }
+    sortedKeyframes(layer, param.key);
+  });
+}
 function refreshFxUI() {
   ensureSelectedLayer();
   effectList.innerHTML = '';
@@ -2186,6 +2211,8 @@ function exportPreset() {
   const data = {
     version: 2,
     bpm: state.bpm,
+    comp: {...state.comp},
+    scenes: null,
     layers: state.layers.map(layer => ({
       effId: layer.effId,
       enabled: layer.enabled,
@@ -2205,6 +2232,15 @@ function importPreset(file) {
     try {
       const data = JSON.parse(r.result);
       if (data.bpm) { state.bpm = data.bpm; bpmInput.value = data.bpm; }
+      if (data.comp) {
+        Object.assign(state.comp, data.comp);
+        state.comp.duration = clamp(parseFloat(state.comp.duration) || 8, 4, 60);
+        state.comp.inPoint = clamp(parseFloat(state.comp.inPoint) || 0, 0, state.comp.duration);
+        state.comp.outPoint = clamp(parseFloat(state.comp.outPoint) || state.comp.duration, state.comp.inPoint + 1 / 60, state.comp.duration);
+        setTimelineTime(state.play.time);
+        syncTimelineControls();
+        rebuildTimelineRuler();
+      }
       const hasLayerData = Array.isArray(data.layers) || Array.isArray(data.effects);
       const incoming = data.layers || data.effects || [];
       if (hasLayerData) {
@@ -2263,6 +2299,7 @@ document.getElementById('presetRand').addEventListener('click', () => {
         layer.values[x.key] = x.min + Math.random() * (x.max - x.min);
       }
     });
+    randomizeLayerKeyframes(layer, def);
     state.layers.push(layer);
   });
   state.selectedLayerId = state.layers[0]?.lid || null;
