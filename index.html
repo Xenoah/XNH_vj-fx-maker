@@ -95,6 +95,7 @@ canvas#view { display: block; max-width: 100%; max-height: 100%; background: #00
 .row { display: flex; gap: 6px; align-items: center; margin: 4px 0; min-width: 0; }
 .row label { flex: 0 0 76px; font-size: 11px; color: #b5bbc8; }
 .row .v { color: #888f9d; font-variant-numeric: tabular-nums; min-width: 36px; text-align: right; font-size: 10px; }
+.row .keybtn { width: 24px; padding: 2px 0; color: #d8c188; }
 .toolbar { display: flex; gap: 4px; flex-wrap: wrap; }
 .toolbar button { padding: 4px 8px; font-size: 11px; }
 
@@ -143,10 +144,14 @@ canvas#view { display: block; max-width: 100%; max-height: 100%; background: #00
 .playhead { position: absolute; top: 0; bottom: 0; left: 0; width: 2px; background: #d6d9df; box-shadow: 0 0 0 1px #0006; pointer-events: none; z-index: 4; }
 #timelineList { overflow: auto; min-height: 0; flex: 1; padding: 4px 6px 8px; }
 .lane-row { height: 26px; margin-bottom: 3px; padding: 0 6px; }
+.lane-row.param { margin-left: 20px; height: 23px; background: #13171d; color: #aeb6c5; }
+.lane-row.param .lane-name { font-size: 11px; color: #aeb6c5; }
 .lane-row .mvbtn { padding: 1px 5px; font-size: 10px; line-height: 1.1; }
 .lane-track { position: relative; flex: 0 0 42%; height: 12px; background: #101318; border: 1px solid #242935; border-radius: 2px; overflow: hidden; }
 .lane-bar { position: absolute; top: 1px; bottom: 1px; border-radius: 1px; background: linear-gradient(90deg, #4c6fb7, #a56a5f); opacity: .9; }
 .lane-row:not(.on) .lane-bar { display: none; }
+.key-marker { position: absolute; top: 50%; width: 9px; height: 9px; border: 1px solid #14161b; background: #d8c188; transform: translate(-50%,-50%) rotate(45deg); cursor: grab; z-index: 3; }
+.key-marker.selected { background: #ffffff; border-color: #6a86d8; box-shadow: 0 0 0 2px #6a86d877; }
 
 .recRing { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #d44; margin-right: 4px; vertical-align: middle; animation: blink 1s infinite; }
 @keyframes blink { 50% { opacity: 0.3; } }
@@ -974,6 +979,8 @@ const state = {
   audio: { ctx: null, analyser: null, level: 0, gain: 2, source: null, kind: null },
   resScale: 1,
   selectedLayerId: null,
+  selectedKey: null,
+  keyClipboard: null,
   categoriesOpen: Object.fromEntries(EFFECT_CATEGORIES.map(cat => [cat.key, true])),
   panels: { leftW: 280, rightW: 330, bottomH: 210 },
   recording: false,
@@ -1144,6 +1151,13 @@ function hexToVec3(h) {
   const b = parseInt(m.substr(4,2),16)/255;
   return [r,g,b];
 }
+function vec3ToHex(v) {
+  const parts = v.map(n => {
+    const x = Math.max(0, Math.min(255, Math.round(n * 255)));
+    return x.toString(16).padStart(2, '0');
+  });
+  return '#' + parts.join('');
+}
 
 // ===================================================================
 // RENDER
@@ -1166,8 +1180,43 @@ function drawQuad() {
 
 let frameCount = 0, lastFps = performance.now(), curFps = 0;
 
-function effectiveAmount(layer) {
-  const v = layer.values;
+function sortedKeyframes(layer, paramKey) {
+  const keys = layer.keyframes[paramKey] || [];
+  keys.sort((a, b) => a.t - b.t);
+  return keys;
+}
+
+function sampleKeyframes(base, keys, t) {
+  if (!keys || !keys.length) return base;
+  if (t <= keys[0].t) return keys[0].v;
+  const last = keys[keys.length - 1];
+  if (t >= last.t) return last.v;
+  for (let i = 0; i < keys.length - 1; i++) {
+    const a = keys[i], b = keys[i + 1];
+    if (t >= a.t && t <= b.t) {
+      const k = (t - a.t) / Math.max(0.0001, b.t - a.t);
+      if (typeof a.v === 'number' && typeof b.v === 'number') return a.v + (b.v - a.v) * k;
+      if (typeof a.v === 'string' && typeof b.v === 'string') {
+        const ca = hexToVec3(a.v), cb = hexToVec3(b.v);
+        return vec3ToHex(ca.map((v, idx) => v + (cb[idx] - v) * k));
+      }
+      return k < 0.5 ? a.v : b.v;
+    }
+  }
+  return base;
+}
+
+function evaluateLayerValues(layer, t) {
+  const values = {...layer.values};
+  Object.keys(layer.keyframes || {}).forEach(paramKey => {
+    values[paramKey] = sampleKeyframes(values[paramKey], sortedKeyframes(layer, paramKey), t);
+  });
+  layer.renderValues = values;
+  return values;
+}
+
+function effectiveAmount(values) {
+  const v = values;
   let amt = v.amount;
   if (v.bpmSync) amt += v.bpmSync * 0.5 * Math.sin(state.beatPhase * Math.PI * 2);
   if (v.audioReactive) amt += v.audioReactive * 0.5 * state.audio.level;
@@ -1244,6 +1293,7 @@ function render() {
     if (!def || def.st === 'mon') continue;
     const prog = getProg(def);
     if (!prog) continue;
+    const values = evaluateLayerValues(layer, t);
 
     bindFBO(target);
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -1261,9 +1311,9 @@ function render() {
     gl.uniform1f(prog.u.u_beat, state.beatPhase);
     gl.uniform1f(prog.u.u_audio, state.audio.level);
 
-    gl.uniform1f(prog.u.u_amount, effectiveAmount(layer));
-    gl.uniform1f(prog.u.u_speed, layer.values.speed);
-    gl.uniform1f(prog.u.u_mix, layer.values.mix);
+    gl.uniform1f(prog.u.u_amount, effectiveAmount(values));
+    gl.uniform1f(prog.u.u_speed, values.speed);
+    gl.uniform1f(prog.u.u_mix, values.mix);
 
     // map first 4 extras to p1..p4 (color extras get separate slot)
     const ps = [0,0,0,0];
@@ -1272,10 +1322,10 @@ function render() {
     if (def.extras) {
       for (const x of def.extras) {
         if (x.type === 'color') {
-          if (x.key === 'cA' || x.key === 'colorA') cA = hexToVec3(layer.values[x.key]);
-          else if (x.key === 'cB' || x.key === 'colorB') cB = hexToVec3(layer.values[x.key]);
+          if (x.key === 'cA' || x.key === 'colorA') cA = hexToVec3(values[x.key]);
+          else if (x.key === 'cB' || x.key === 'colorB') cB = hexToVec3(values[x.key]);
         } else {
-          if (pi < 4) ps[pi++] = layer.values[x.key];
+          if (pi < 4) ps[pi++] = values[x.key];
         }
       }
     }
@@ -1663,6 +1713,23 @@ function defaultValuesFor(def) {
   if (def.extras) def.extras.forEach(x => values[x.key] = x.def);
   return values;
 }
+const BASE_PARAM_DEFS = [
+  {key:'amount',  label:'amount',  min:0, max:1, step:0.001},
+  {key:'speed',   label:'speed',   min:0, max:1, step:0.001},
+  {key:'mix',     label:'mix',     min:0, max:1, step:0.001},
+  {key:'bpmSync', label:'bpmSync', min:0, max:1, step:0.001},
+  {key:'audioReactive', label:'audio', min:0, max:1, step:0.001},
+];
+function paramDefsFor(def) {
+  return BASE_PARAM_DEFS.concat((def.extras || []).map(x => ({
+    key: x.key,
+    label: x.label,
+    min: x.min,
+    max: x.max,
+    step: 0.001,
+    type: x.type
+  })));
+}
 function createLayer(effId, opts = {}) {
   const def = effectDef(effId);
   if (!def) return null;
@@ -1670,10 +1737,12 @@ function createLayer(effId, opts = {}) {
     lid: opts.lid || `L${state.nextLayerSeq++}`,
     effId,
     enabled: !!opts.enabled,
+    open: opts.open !== undefined ? !!opts.open : true,
     values: defaultValuesFor(def),
     keyframes: {}
   };
   Object.assign(layer.values, opts.values || {});
+  if (opts.keyframes) layer.keyframes = JSON.parse(JSON.stringify(opts.keyframes));
   return layer;
 }
 function ensureSelectedLayer() {
@@ -1697,7 +1766,7 @@ function addLayer(effId) {
 function duplicateLayer(lid) {
   const src = layerState(lid);
   if (!src) return;
-  const copy = createLayer(src.effId, {enabled: src.enabled, values: {...src.values}});
+  const copy = createLayer(src.effId, {enabled: src.enabled, values: {...src.values}, keyframes: src.keyframes, open: src.open});
   if (!copy) return;
   const idx = state.layers.findIndex(layer => layer.lid === lid);
   state.layers.splice(idx + 1, 0, copy);
@@ -1708,6 +1777,7 @@ function deleteLayer(lid) {
   const idx = state.layers.findIndex(layer => layer.lid === lid);
   if (idx < 0) return;
   state.layers.splice(idx, 1);
+  if (state.selectedKey?.lid === lid) state.selectedKey = null;
   state.selectedLayerId = state.layers[Math.min(idx, state.layers.length - 1)]?.lid || null;
   refreshFxUI();
 }
@@ -1725,6 +1795,76 @@ function toggleLayer(lid, enabled) {
   layer.enabled = enabled;
   if (layer.enabled && def.st !== 'mon') getProg(def);
   state.selectedLayerId = lid;
+  refreshFxUI();
+}
+function toggleLayerOpen(lid) {
+  const layer = layerState(lid);
+  if (!layer) return;
+  layer.open = !layer.open;
+  state.selectedLayerId = lid;
+  refreshFxUI();
+}
+function selectKey(lid, paramKey, idx) {
+  state.selectedLayerId = lid;
+  state.selectedKey = {lid, paramKey, idx};
+  refreshFxUI();
+}
+function addKeyframe(lid, paramKey) {
+  const layer = layerState(lid);
+  if (!layer) return;
+  const value = evaluateLayerValues(layer, state.play.time)[paramKey] ?? layer.values[paramKey];
+  if (!layer.keyframes[paramKey]) layer.keyframes[paramKey] = [];
+  const keys = layer.keyframes[paramKey];
+  const t = snapTime(state.play.time);
+  const existing = keys.findIndex(k => Math.abs(k.t - t) < 1 / 120);
+  if (existing >= 0) keys[existing].v = value;
+  else keys.push({t, v: value});
+  sortedKeyframes(layer, paramKey);
+  const idx = keys.findIndex(k => Math.abs(k.t - t) < 1 / 120);
+  state.selectedKey = {lid, paramKey, idx};
+  state.selectedLayerId = lid;
+  refreshFxUI();
+}
+function deleteSelectedKey() {
+  const sel = state.selectedKey;
+  const layer = sel && layerState(sel.lid);
+  const keys = layer && layer.keyframes[sel.paramKey];
+  if (!keys || !keys[sel.idx]) return;
+  keys.splice(sel.idx, 1);
+  if (!keys.length) delete layer.keyframes[sel.paramKey];
+  state.selectedKey = null;
+  refreshFxUI();
+}
+function moveKey(lid, paramKey, idx, t, refresh = true) {
+  const layer = layerState(lid);
+  const keys = layer && layer.keyframes[paramKey];
+  if (!keys || !keys[idx]) return;
+  const key = keys[idx];
+  key.t = clamp(snapTime(t), 0, state.comp.duration);
+  if (refresh) sortedKeyframes(layer, paramKey);
+  const nextIdx = keys.indexOf(key);
+  state.selectedKey = {lid, paramKey, idx: Math.max(0, Math.min(keys.length - 1, nextIdx))};
+  if (refresh) refreshFxUI();
+}
+function copySelectedKey() {
+  const sel = state.selectedKey;
+  const layer = sel && layerState(sel.lid);
+  const key = layer && layer.keyframes[sel.paramKey]?.[sel.idx];
+  if (!key) return;
+  state.keyClipboard = {paramKey: sel.paramKey, v: key.v};
+}
+function pasteKeyClipboard() {
+  if (!state.keyClipboard || !state.selectedLayerId) return;
+  const layer = layerState(state.selectedLayerId);
+  if (!layer) return;
+  const paramKey = state.keyClipboard.paramKey;
+  if (!(paramKey in layer.values)) return;
+  if (!layer.keyframes[paramKey]) layer.keyframes[paramKey] = [];
+  const t = snapTime(state.play.time);
+  layer.keyframes[paramKey].push({t, v: state.keyClipboard.v});
+  sortedKeyframes(layer, paramKey);
+  const idx = layer.keyframes[paramKey].findIndex(k => Math.abs(k.t - t) < 1 / 120);
+  state.selectedKey = {lid: layer.lid, paramKey, idx};
   refreshFxUI();
 }
 function refreshFxUI() {
@@ -1843,16 +1983,21 @@ function buildTimeline() {
       (state.selectedLayerId === layer.lid ? ' selected' : '');
     row.innerHTML = `
       <span class="num">${String(idx + 1).padStart(2,'0')}</span>
+      <button class="mvbtn" data-act="open">${layer.open ? '▼' : '▶'}</button>
       <input type="checkbox" ${layer.enabled?'checked':''} aria-label="${def.name} 有効">
       <span class="lane-name">${def.name}</span>
       <button class="mvbtn" data-act="up">▲</button>
       <button class="mvbtn" data-act="down">▼</button>
-      <div class="lane-track"><div class="lane-bar" style="left:${inPct.toFixed(3)}%;width:${Math.max(0, outPct - inPct).toFixed(3)}%;"></div></div>
+      <div class="lane-track"><div class="lane-bar" style="left:${inPct.toFixed(3)}%;width:${Math.max(0, outPct - inPct).toFixed(3)}%;"></div>${renderLayerKeys(layer)}</div>
     `;
     row.addEventListener('click', () => selectLayer(layer.lid));
     const chk = row.querySelector('input');
     chk.addEventListener('click', e => e.stopPropagation());
     chk.addEventListener('change', e => toggleLayer(layer.lid, e.target.checked));
+    row.querySelector('[data-act=open]').addEventListener('click', e => {
+      e.stopPropagation();
+      toggleLayerOpen(layer.lid);
+    });
     row.querySelector('[data-act=up]').addEventListener('click', e => {
       e.stopPropagation();
       moveLayer(layer.lid, -1);
@@ -1862,19 +2007,92 @@ function buildTimeline() {
       moveLayer(layer.lid, 1);
     });
     timelineList.appendChild(row);
+    row.querySelectorAll('.key-marker').forEach(marker => setupKeyMarker(marker));
+    if (layer.open) buildParamRows(layer, def);
+  });
+}
+
+function renderLayerKeys(layer) {
+  const keys = [];
+  Object.keys(layer.keyframes || {}).forEach(paramKey => {
+    sortedKeyframes(layer, paramKey).forEach((key, idx) => {
+      const selected = state.selectedKey &&
+        state.selectedKey.lid === layer.lid &&
+        state.selectedKey.paramKey === paramKey &&
+        state.selectedKey.idx === idx;
+      keys.push(`<button class="key-marker ${selected ? 'selected' : ''}" data-lid="${layer.lid}" data-param="${paramKey}" data-idx="${idx}" style="left:${(key.t / state.comp.duration * 100).toFixed(3)}%"></button>`);
+    });
+  });
+  return keys.join('');
+}
+
+function buildParamRows(layer, def) {
+  paramDefsFor(def).forEach(param => {
+    const keys = sortedKeyframes(layer, param.key);
+    const row = document.createElement('div');
+    row.className = 'lane-row param' + (state.selectedLayerId === layer.lid ? ' selected' : '');
+    row.innerHTML = `
+      <span class="num">${String(keys.length).padStart(2,'0')}</span>
+      <span class="lane-name">${param.label}</span>
+      <button class="mvbtn" data-act="add-key">◆</button>
+      <div class="lane-track">${keys.map((key, idx) => {
+        const selected = state.selectedKey &&
+          state.selectedKey.lid === layer.lid &&
+          state.selectedKey.paramKey === param.key &&
+          state.selectedKey.idx === idx;
+        return `<button class="key-marker ${selected ? 'selected' : ''}" data-lid="${layer.lid}" data-param="${param.key}" data-idx="${idx}" style="left:${(key.t / state.comp.duration * 100).toFixed(3)}%"></button>`;
+      }).join('')}</div>
+    `;
+    row.querySelector('[data-act=add-key]').addEventListener('click', e => {
+      e.stopPropagation();
+      addKeyframe(layer.lid, param.key);
+    });
+    timelineList.appendChild(row);
+    row.querySelectorAll('.key-marker').forEach(marker => setupKeyMarker(marker));
+  });
+}
+
+function setupKeyMarker(marker) {
+  marker.addEventListener('click', e => {
+    e.stopPropagation();
+    selectKey(marker.dataset.lid, marker.dataset.param, parseInt(marker.dataset.idx, 10));
+  });
+  marker.addEventListener('pointerdown', e => {
+    e.stopPropagation();
+    marker.setPointerCapture(e.pointerId);
+    state.selectedLayerId = marker.dataset.lid;
+    state.selectedKey = {
+      lid: marker.dataset.lid,
+      paramKey: marker.dataset.param,
+      idx: parseInt(marker.dataset.idx, 10)
+    };
+    marker.classList.add('selected');
+    const track = marker.closest('.lane-track');
+    const move = ev => {
+      const rect = track.getBoundingClientRect();
+      const x = clamp(ev.clientX - rect.left, 0, rect.width);
+      const t = x / Math.max(1, rect.width) * state.comp.duration;
+      moveKey(marker.dataset.lid, marker.dataset.param, parseInt(marker.dataset.idx, 10), t, false);
+      const layer = layerState(marker.dataset.lid);
+      const key = layer?.keyframes[marker.dataset.param]?.[parseInt(marker.dataset.idx, 10)];
+      if (key) marker.style.left = (key.t / state.comp.duration * 100).toFixed(3) + '%';
+    };
+    const up = ev => {
+      try { marker.releasePointerCapture(ev.pointerId); } catch (err) {}
+      marker.removeEventListener('pointermove', move);
+      marker.removeEventListener('pointerup', up);
+      const layer = layerState(marker.dataset.lid);
+      if (layer) sortedKeyframes(layer, marker.dataset.param);
+      refreshFxUI();
+    };
+    marker.addEventListener('pointermove', move);
+    marker.addEventListener('pointerup', up);
   });
 }
 
 function buildEffectBody(body, layer, def) {
   body.innerHTML = '';
-  const baseParams = [
-    {key:'amount',  label:'amount',  min:0, max:1, step:0.001},
-    {key:'speed',   label:'speed',   min:0, max:1, step:0.001},
-    {key:'mix',     label:'mix',     min:0, max:1, step:0.001},
-    {key:'bpmSync', label:'bpmSync', min:0, max:1, step:0.001},
-    {key:'audioReactive', label:'audio', min:0, max:1, step:0.001},
-  ];
-  baseParams.forEach(p => body.appendChild(makeRange(layer, p)));
+  BASE_PARAM_DEFS.forEach(p => body.appendChild(makeRange(layer, p)));
   if (def.extras && def.extras.length) {
     const hr = document.createElement('hr'); body.appendChild(hr);
     def.extras.forEach(x => {
@@ -1903,7 +2121,12 @@ function makeRange(layer, p) {
     layer.values[p.key] = parseFloat(inp.value);
     v.textContent = parseFloat(inp.value).toFixed(2);
   });
-  row.appendChild(lab); row.appendChild(inp); row.appendChild(v);
+  const keyBtn = document.createElement('button');
+  keyBtn.className = 'keybtn';
+  keyBtn.textContent = '◆';
+  keyBtn.title = '現在時刻にキーフレーム追加';
+  keyBtn.addEventListener('click', () => addKeyframe(layer.lid, p.key));
+  row.appendChild(lab); row.appendChild(inp); row.appendChild(v); row.appendChild(keyBtn);
   return row;
 }
 function makeColor(layer, x) {
@@ -1913,7 +2136,12 @@ function makeColor(layer, x) {
   const inp = document.createElement('input');
   inp.type = 'color'; inp.value = layer.values[x.key] || x.def;
   inp.addEventListener('input', () => { layer.values[x.key] = inp.value; });
-  row.appendChild(lab); row.appendChild(inp);
+  const keyBtn = document.createElement('button');
+  keyBtn.className = 'keybtn';
+  keyBtn.textContent = '◆';
+  keyBtn.title = '現在時刻にキーフレーム追加';
+  keyBtn.addEventListener('click', () => addKeyframe(layer.lid, x.key));
+  row.appendChild(lab); row.appendChild(inp); row.appendChild(keyBtn);
   return row;
 }
 
@@ -2111,6 +2339,18 @@ document.getElementById('hidePanelBtn').addEventListener('click', () => {
 document.addEventListener('fullscreenchange', () => setTimeout(resizeCanvas, 50));
 document.addEventListener('keydown', e => {
   if (e.target.matches('input,textarea,select')) return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+    copySelectedKey();
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+    pasteKeyClipboard();
+    return;
+  }
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    deleteSelectedKey();
+    return;
+  }
   if (e.code === 'Space') {
     e.preventDefault();
     togglePlayback();
