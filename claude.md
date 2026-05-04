@@ -104,6 +104,12 @@
 - [x] 右クリックメニューを追加し、プレビュー/タイムライン/レイヤー上で再生、In/Out、素材読込、エフェクト追加、レイヤー複製/削除、録画、PNG、表示切替を実行可能
 - [x] 右サイドパネルに Info / Audio / Preview / Effects & Presets の簡易操作面を追加し、Effect Controls と併用できる構成に変更
 
+### Phase 12 — 波形可視化 / FFT・In-Out のレイヤー個別化  ✅
+- [x] **波形を見れるように**: ルーラー直下に専用 `.timeline-wave` ストリップ (44px) を追加、ミラー描画 + グラデーション。プレイヘッドはルーラーと波形ストリップの両方を貫通。波形ストリップ自身もスクラブ可能。リサイズ追従。
+- [x] **FFT 連動をエフェクトごとに**: 各レイヤーに `fft: {freq, width, threshold, edge, gain}` (+ runtime `_level/_gate/_env`) を保持。Effect Controls にレイヤー専用 FFT サブパネル (← global / → global コピー対応)。pollAudio で全シーンのレイヤー毎に `updateLayerFftTrigger()`。`effectiveAmount(values, layer)` と shader uniform `u_freq/u_trigger` がレイヤー値を使用。
+- [x] **In/Out をエフェクトごとに**: Effect Controls に "Layer In / Out" サブパネル (数値入力 + @playhead ボタン + full)。`Shift+I` / `Shift+O` で選択レイヤー In/Out をプレイヘッドに設定 (素の `I` / `O` はコンポ用)。右クリックメニューに「現在時刻を Layer In/Out」追加。
+- [x] **プリセット v4**: `version: 4`、各レイヤーに `fft` 同梱、`audioTrigger.gain` 追加。v1/v2/v3 を互換読込 (グローバル `audioTrigger` を fallback として全レイヤーに転写)。
+
 ---
 
 ## アーキテクチャ詳細
