@@ -95,8 +95,20 @@ select { background: #101218; border: 1px solid var(--line); padding: 3px 6px; b
 .side-kv span:nth-child(odd) { color: #858585; }
 .side-panel .toolbar { margin-top: 4px; }
 
-#center { grid-area: center; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  background: #222; position: relative; min-width: 0; min-height: 0; padding: 8px; border-top: 1px solid #343434; }
+#center { grid-area: center; display: flex; flex-direction: column; align-items: stretch; justify-content: center;
+  background: #222; position: relative; min-width: 0; min-height: 0; padding: 8px 8px 0; border-top: 1px solid #343434; }
+#viewWrap { flex: 1 1 auto; }
+#previewControls { flex: 0 0 auto; display: flex; align-items: center; gap: 4px; padding: 6px 8px; background: #1c1e22; border: 1px solid #2a2e36; border-radius: 4px; margin-top: 6px; }
+#previewControls .pc-btn { background: #232830; border: 1px solid #303743; color: #c8c8c8; padding: 3px 9px; font-size: 13px; min-width: 30px; line-height: 1.1; border-radius: 3px; cursor: pointer; }
+#previewControls .pc-btn:hover { background: #2c333d; border-color: #3a4252; }
+#previewControls .pc-btn.pc-play.playing { background: #2c4f3a; border-color: #4a8862; color: #b8f0c8; }
+#previewControls .pc-btn#pcLoop.toggle-on { background: #253a30; border-color: #3f7c58; color: #b8f0c8; }
+#previewControls .pc-time { font: 11px ui-monospace, Consolas, monospace; color: #cbd3e2; min-width: 110px; text-align: right; padding: 0 6px; }
+#previewControls .pc-seek-wrap { flex: 1 1 auto; min-width: 80px; display: flex; align-items: center; }
+#previewControls .pc-seek-track { position: relative; flex: 1 1 auto; height: 8px; background: #0e1014; border: 1px solid #1f242c; border-radius: 4px; cursor: pointer; }
+#previewControls .pc-seek-loop { position: absolute; top: 0; bottom: 0; background: #6a86d822; border-left: 1px solid #6a86d855; border-right: 1px solid #6a86d855; pointer-events: none; }
+#previewControls .pc-seek-fill { position: absolute; top: 0; bottom: 0; left: 0; background: linear-gradient(90deg, #4c6fb7aa, #88d8a3aa); pointer-events: none; }
+#previewControls .pc-seek-thumb { position: absolute; top: -3px; bottom: -3px; width: 3px; background: #d6d9df; box-shadow: 0 0 0 1px #0008; pointer-events: none; }
 #viewWrap { position: relative; max-width: 100%; max-height: 100%; display: flex; align-items: center; justify-content: center; }
 canvas#view { display: block; max-width: 100%; max-height: 100%; background: #000;
   box-shadow: 0 0 0 1px #23262d, 0 8px 30px #0008; }
@@ -165,6 +177,8 @@ canvas#view { display: block; max-width: 100%; max-height: 100%; background: #00
 .timeline-head .th-spacer .zoom-btn:hover { background: #2c333d; }
 .timeline-head .th-track { position: relative; min-width: 0; }
 .timeline-head .playhead { z-index: 5; }
+#timelineList { position: relative; }
+#timelineList .list-playhead { position: absolute; top: 0; bottom: 0; width: 1px; background: #d6d9df66; pointer-events: none; z-index: 6; }
 .timeline-ruler { position: relative; height: 28px; border-bottom: 1px solid var(--line-soft); background: #111318; overflow: hidden; cursor: ew-resize; }
 .timeline-wave { position: relative; height: 44px; background: #0c0e13; border-bottom: 1px solid var(--line-soft); overflow: hidden; cursor: ew-resize; display: none; }
 .timeline-scrollbar { position: relative; height: 12px; background: #15171c; border-top: 1px solid #050505; overflow: hidden; cursor: pointer; display: grid; grid-template-columns: var(--track-offset) 1fr; }
@@ -405,6 +419,24 @@ hr { border: 0; border-top: 1px solid var(--line-soft); margin: 8px 0; }
 <main id="center">
   <div id="viewWrap"><canvas id="view" width="1280" height="720"></canvas></div>
   <div id="hud"></div>
+  <div id="previewControls">
+    <button class="pc-btn" id="pcRewind" title="先頭 (Home)">⏮</button>
+    <button class="pc-btn" id="pcStepBack" title="-1f (←)">◀</button>
+    <button class="pc-btn pc-play" id="pcPlay" title="再生 / 停止 (Space)">▶</button>
+    <button class="pc-btn" id="pcStepFwd" title="+1f (→)">▶</button>
+    <button class="pc-btn" id="pcEnd" title="末尾 (End)">⏭</button>
+    <button class="pc-btn" id="pcLoop" title="ループ">⟲</button>
+    <button class="pc-btn" id="pcMarkIn" title="In (I)">[</button>
+    <button class="pc-btn" id="pcMarkOut" title="Out (O)">]</button>
+    <span class="pc-time" id="pcTimecode">00:00.0 / 00:08.0</span>
+    <div class="pc-seek-wrap">
+      <div class="pc-seek-track" id="pcSeekTrack">
+        <div class="pc-seek-loop" id="pcSeekLoop"></div>
+        <div class="pc-seek-fill" id="pcSeekFill"></div>
+        <div class="pc-seek-thumb" id="pcSeekThumb"></div>
+      </div>
+    </div>
+  </div>
 </main>
 
 <div class="panel-resizer" id="resizeRight"></div>
@@ -2040,7 +2072,32 @@ function redo() {
 function updateTransportButtons() {
   playBtn.textContent = state.play.playing ? '停止' : '再生';
   loopBtn.classList.toggle('toggle-on', state.comp.loop);
+  const pcPlay = document.getElementById('pcPlay');
+  if (pcPlay) {
+    pcPlay.textContent = state.play.playing ? '⏸' : '▶';
+    pcPlay.classList.toggle('playing', state.play.playing);
+  }
+  const pcLoop = document.getElementById('pcLoop');
+  if (pcLoop) pcLoop.classList.toggle('toggle-on', state.comp.loop);
   updateHistoryButtons();
+}
+
+function updatePreviewSeekUI() {
+  const pcTimecode = document.getElementById('pcTimecode');
+  const pcSeekFill = document.getElementById('pcSeekFill');
+  const pcSeekThumb = document.getElementById('pcSeekThumb');
+  const pcSeekLoop = document.getElementById('pcSeekLoop');
+  const dur = Math.max(0.001, state.comp.duration);
+  const pct = clamp(state.play.time / dur, 0, 1) * 100;
+  if (pcTimecode) pcTimecode.textContent = `${formatTime(state.play.time)} / ${formatTime(dur)}`;
+  if (pcSeekFill) pcSeekFill.style.width = pct.toFixed(3) + '%';
+  if (pcSeekThumb) pcSeekThumb.style.left = pct.toFixed(3) + '%';
+  if (pcSeekLoop) {
+    const lp = state.comp.inPoint / dur * 100;
+    const rp = state.comp.outPoint / dur * 100;
+    pcSeekLoop.style.left = lp.toFixed(3) + '%';
+    pcSeekLoop.style.width = Math.max(0, rp - lp).toFixed(3) + '%';
+  }
 }
 
 function syncTimelineControls() {
@@ -2159,8 +2216,31 @@ function updateTimelineVisuals() {
   }
   if (inMarkerEl) inMarkerEl.style.left = timeToPct(state.comp.inPoint).toFixed(3) + '%';
   if (outMarkerEl) outMarkerEl.style.left = timeToPct(state.comp.outPoint).toFixed(3) + '%';
+  updateListPlayhead();
   updatePreviewSeekUI();
   updateZoomScrollbarUI();
+}
+
+function updateListPlayhead() {
+  const list = document.getElementById('timelineList');
+  if (!list) return;
+  let ph = list.querySelector('.list-playhead');
+  if (!ph) {
+    ph = document.createElement('div');
+    ph.className = 'list-playhead';
+    list.appendChild(ph);
+  }
+  const offsetStr = getComputedStyle(document.documentElement).getPropertyValue('--track-offset').trim();
+  const offset = parseFloat(offsetStr) || 0;
+  const cs = getComputedStyle(list);
+  const padL = parseFloat(cs.paddingLeft) || 0;
+  const padR = parseFloat(cs.paddingRight) || 0;
+  const w = list.clientWidth - padL - padR;
+  const trackW = Math.max(1, w - offset);
+  const pct = timeToPct(state.play.time) / 100;
+  const left = padL + offset + pct * trackW;
+  ph.style.left = left + 'px';
+  ph.style.display = (pct < 0 || pct > 1) ? 'none' : 'block';
 }
 
 function setDuration(v) {
@@ -4362,16 +4442,62 @@ document.addEventListener('pointerdown', e => {
 window.addEventListener('blur', closeContextMenu);
 
 // ===================================================================
+// PREVIEW CONTROLS WIRING
+// ===================================================================
+function setupPreviewControls() {
+  const pcRewind = document.getElementById('pcRewind');
+  const pcStepBack = document.getElementById('pcStepBack');
+  const pcPlay = document.getElementById('pcPlay');
+  const pcStepFwd = document.getElementById('pcStepFwd');
+  const pcEnd = document.getElementById('pcEnd');
+  const pcLoop = document.getElementById('pcLoop');
+  const pcMarkIn = document.getElementById('pcMarkIn');
+  const pcMarkOut = document.getElementById('pcMarkOut');
+  const pcSeekTrack = document.getElementById('pcSeekTrack');
+  pcRewind.addEventListener('click', () => { state.play.playing = false; setTimelineTime(0, {autopan: false}); updateTransportButtons(); });
+  pcStepBack.addEventListener('click', () => { state.play.playing = false; setTimelineTime(state.play.time - 1 / 60, {autopan: false}); updateTransportButtons(); });
+  pcPlay.addEventListener('click', togglePlayback);
+  pcStepFwd.addEventListener('click', () => { state.play.playing = false; setTimelineTime(state.play.time + 1 / 60, {autopan: false}); updateTransportButtons(); });
+  pcEnd.addEventListener('click', () => { state.play.playing = false; setTimelineTime(state.comp.duration, {autopan: false}); updateTransportButtons(); });
+  pcLoop.addEventListener('click', () => { state.comp.loop = !state.comp.loop; updateTransportButtons(); });
+  pcMarkIn.addEventListener('click', () => runCommand('Set In point', () => setInPoint(state.play.time)));
+  pcMarkOut.addEventListener('click', () => runCommand('Set Out point', () => setOutPoint(state.play.time)));
+  let pcSeekDragging = false;
+  const seekFromEvent = e => {
+    const rect = pcSeekTrack.getBoundingClientRect();
+    const x = clamp(e.clientX - rect.left, 0, rect.width);
+    return (x / Math.max(1, rect.width)) * state.comp.duration;
+  };
+  pcSeekTrack.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    pcSeekDragging = true;
+    pcSeekTrack.setPointerCapture(e.pointerId);
+    state.play.playing = false;
+    setTimelineTime(seekFromEvent(e), {snap: true, autopan: false});
+    updateTransportButtons();
+  });
+  pcSeekTrack.addEventListener('pointermove', e => {
+    if (pcSeekDragging) setTimelineTime(seekFromEvent(e), {snap: true, autopan: false});
+  });
+  pcSeekTrack.addEventListener('pointerup', e => {
+    pcSeekDragging = false;
+    try { pcSeekTrack.releasePointerCapture(e.pointerId); } catch (err) {}
+  });
+}
+
+// ===================================================================
 // INIT
 // ===================================================================
 applyPanelSizes();
 setupTopToolbar();
+setupPreviewControls();
 updateSceneControls();
 syncTimelineControls();
 rebuildTimelineRuler();
 setupPanelResize();
 refreshFxUI();
 resizeCanvas();
+updateZoomScrollbarUI();
 requestAnimationFrame(render);
 requestAnimationFrame(pollAudio);
 
