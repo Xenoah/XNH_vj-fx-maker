@@ -10,6 +10,7 @@
   --left-w: 280px;
   --right-w: 330px;
   --bottom-h: 210px;
+  --track-offset: 232px;
   --panel: #232323;
   --panel-2: #2a2a2a;
   --line: #3a3a3a;
@@ -157,10 +158,20 @@ canvas#view { display: block; max-width: 100%; max-height: 100%; background: #00
 .timeline-controls { display: flex; align-items: center; gap: 10px; padding: 5px 10px; border-bottom: 1px solid #111; background: #2a2a2a; min-height: 34px; overflow-x: auto; }
 .timeline-controls label { display: flex; align-items: center; gap: 5px; color: #b5bbc8; white-space: nowrap; }
 .timeline-controls input[type=number] { width: 62px; }
-.timeline-head { position: relative; flex: 0 0 auto; }
+.timeline-head { position: relative; flex: 0 0 auto; display: grid; grid-template-columns: var(--track-offset) 1fr; }
+.timeline-head .th-spacer { background: #1a1c20; border-right: 1px solid #050505; display: flex; align-items: center; padding: 0 8px; gap: 6px; font-size: 10px; color: #8a92a3; }
+.timeline-head .th-spacer .zoom-readout { margin-left: auto; font-family: ui-monospace, Consolas, monospace; color: #aeb6c5; }
+.timeline-head .th-spacer .zoom-btn { padding: 1px 6px; font-size: 11px; background: #232830; border: 1px solid #303743; color: #c8c8c8; border-radius: 2px; cursor: pointer; }
+.timeline-head .th-spacer .zoom-btn:hover { background: #2c333d; }
+.timeline-head .th-track { position: relative; min-width: 0; }
 .timeline-head .playhead { z-index: 5; }
-.timeline-ruler { position: relative; height: 28px; border-bottom: 1px solid var(--line-soft); background: #111318; overflow: hidden; cursor: ew-resize; flex: 0 0 28px; }
+.timeline-ruler { position: relative; height: 28px; border-bottom: 1px solid var(--line-soft); background: #111318; overflow: hidden; cursor: ew-resize; }
 .timeline-wave { position: relative; height: 44px; background: #0c0e13; border-bottom: 1px solid var(--line-soft); overflow: hidden; cursor: ew-resize; display: none; }
+.timeline-scrollbar { position: relative; height: 12px; background: #15171c; border-top: 1px solid #050505; overflow: hidden; cursor: pointer; display: grid; grid-template-columns: var(--track-offset) 1fr; }
+.timeline-scrollbar .sb-spacer { background: #1a1c20; border-right: 1px solid #050505; }
+.timeline-scrollbar .sb-track { position: relative; }
+.timeline-scrollbar .sb-thumb { position: absolute; top: 2px; bottom: 2px; background: #4a526288; border: 1px solid #5a627aaa; border-radius: 3px; min-width: 18px; cursor: grab; }
+.timeline-scrollbar .sb-thumb:active { cursor: grabbing; }
 .timeline-wave.has-audio { display: block; }
 .timeline-wave .wave-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #4a5260; font: 10px ui-monospace, Consolas, monospace; pointer-events: none; }
 .timeline-wave canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
@@ -178,12 +189,15 @@ canvas#view { display: block; max-width: 100%; max-height: 100%; background: #00
 .inout-marker::after { content: attr(data-label); position: absolute; top: 14px; left: 3px; color: #d8c188; font: 9px/1 ui-monospace, Consolas, monospace; }
 .playhead { position: absolute; top: 0; bottom: 0; left: 0; width: 2px; background: #d6d9df; box-shadow: 0 0 0 1px #0006; pointer-events: none; z-index: 4; }
 #timelineList { overflow: auto; min-height: 0; flex: 1; padding: 4px 6px 8px; }
-.lane-row { height: 26px; margin-bottom: 3px; padding: 0 6px; }
-.lane-row.param { margin-left: 20px; height: 23px; background: #13171d; color: #aeb6c5; }
+.lane-row { display: grid; grid-template-columns: var(--track-offset) 1fr; align-items: center; height: 26px; margin-bottom: 3px; padding: 0; }
+.lane-row.param { height: 23px; background: #13171d; color: #aeb6c5; }
 .lane-row.param.graph { height: 54px; align-items: stretch; padding-top: 5px; padding-bottom: 5px; }
 .lane-row.param .lane-name { font-size: 11px; color: #aeb6c5; }
 .lane-row .mvbtn { padding: 1px 5px; font-size: 10px; line-height: 1.1; }
-.lane-track { position: relative; flex: 0 0 42%; height: 12px; background: #101318; border: 1px solid #242935; border-radius: 2px; overflow: hidden; align-self: center; }
+.lane-controls { display: flex; align-items: center; gap: 6px; padding: 0 6px; min-width: 0; overflow: hidden; }
+.lane-controls .lane-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lane-row.param .lane-controls { padding-left: 24px; }
+.lane-track { position: relative; min-width: 0; height: 12px; background: #101318; border-top: 1px solid #242935; border-bottom: 1px solid #242935; overflow: hidden; align-self: center; }
 .lane-row.graph .lane-track { height: 42px; }
 .lane-bar { position: absolute; top: 1px; bottom: 1px; border-radius: 1px; background: linear-gradient(90deg, #4c6fb7, #a56a5f); opacity: .9; cursor: grab; min-width: 8px; }
 .lane-bar:active { cursor: grabbing; }
@@ -476,14 +490,26 @@ hr { border: 0; border-top: 1px solid var(--line-soft); margin: 8px 0; }
     <label>Out <input type="number" id="outPointInput" min="0" max="60" step="0.01" value="8"></label>
   </div>
   <div class="timeline-head">
-    <div class="timeline-ruler"></div>
-    <div class="timeline-wave" id="timelineWave">
-      <span class="wave-name" id="waveName"></span>
-      <canvas id="waveCanvas"></canvas>
+    <div class="th-spacer">
+      <button class="zoom-btn" id="zoomOutBtn" title="ズームアウト (-)">−</button>
+      <button class="zoom-btn" id="zoomInBtn" title="ズームイン (+)">＋</button>
+      <button class="zoom-btn" id="zoomResetBtn" title="ズームリセット (\\)">⤧</button>
+      <span class="zoom-readout" id="zoomReadout">x1.0</span>
     </div>
-    <div class="playhead" id="playhead"></div>
+    <div class="th-track" id="thTrack">
+      <div class="timeline-ruler"></div>
+      <div class="timeline-wave" id="timelineWave">
+        <span class="wave-name" id="waveName"></span>
+        <canvas id="waveCanvas"></canvas>
+      </div>
+      <div class="playhead" id="playhead"></div>
+    </div>
   </div>
   <div id="timelineList"></div>
+  <div class="timeline-scrollbar" id="timelineScrollbar">
+    <div class="sb-spacer"></div>
+    <div class="sb-track" id="sbTrack"><div class="sb-thumb" id="sbThumb"></div></div>
+  </div>
 </section>
 
 <div id="contextMenu" class="context-menu" role="menu"></div>
@@ -1295,6 +1321,7 @@ const state = {
   history: { past: [], future: [] },
   categoriesOpen: Object.fromEntries(EFFECT_CATEGORIES.map(cat => [cat.key, true])),
   panels: { leftW: 280, rightW: 330, bottomH: 210 },
+  view: { zoom: 1, scroll: 0 },
   recording: false,
   recorder: null,
   recChunks: [],
@@ -1560,6 +1587,64 @@ function beatDuration() {
   return 60 / Math.max(1, state.bpm);
 }
 
+// ===================================================================
+// TIMELINE VIEWPORT (zoom + scroll)
+// ===================================================================
+function viewVisibleDuration() {
+  const dur = Math.max(0.001, state.comp.duration);
+  return dur / Math.max(1, state.view.zoom || 1);
+}
+function viewStartTime() {
+  const dur = Math.max(0.001, state.comp.duration);
+  const visible = viewVisibleDuration();
+  const maxScroll = Math.max(0, dur - visible);
+  return clamp(state.view.scroll, 0, 1) * maxScroll;
+}
+function timeToPct(t) {
+  const visible = viewVisibleDuration();
+  if (visible <= 0) return 0;
+  return (t - viewStartTime()) / visible * 100;
+}
+function pctToTime(pct) {
+  return viewStartTime() + (pct / 100) * viewVisibleDuration();
+}
+function clampViewScroll() {
+  state.view.zoom = clamp(state.view.zoom || 1, 1, 64);
+  state.view.scroll = clamp(state.view.scroll || 0, 0, 1);
+}
+function setViewZoom(nextZoom, anchorTime) {
+  const oldZoom = state.view.zoom || 1;
+  nextZoom = clamp(nextZoom, 1, 64);
+  if (nextZoom === oldZoom) return;
+  const dur = Math.max(0.001, state.comp.duration);
+  const oldVisible = dur / oldZoom;
+  const newVisible = dur / nextZoom;
+  const oldStart = state.view.scroll * Math.max(0, dur - oldVisible);
+  const anchor = anchorTime ?? (oldStart + oldVisible / 2);
+  const fraction = (anchor - oldStart) / Math.max(0.0001, oldVisible);
+  const newStart = clamp(anchor - fraction * newVisible, 0, Math.max(0, dur - newVisible));
+  state.view.zoom = nextZoom;
+  state.view.scroll = (dur - newVisible) > 0.0001 ? newStart / (dur - newVisible) : 0;
+  clampViewScroll();
+}
+function setViewScroll(scroll01) {
+  state.view.scroll = clamp(scroll01, 0, 1);
+}
+function ensurePlayheadVisible() {
+  const t = state.play.time;
+  const start = viewStartTime();
+  const visible = viewVisibleDuration();
+  if (t < start) {
+    const dur = Math.max(0.001, state.comp.duration);
+    state.view.scroll = (dur - visible) > 0.0001 ? Math.max(0, t - visible * 0.1) / (dur - visible) : 0;
+    clampViewScroll();
+  } else if (t > start + visible) {
+    const dur = Math.max(0.001, state.comp.duration);
+    state.view.scroll = (dur - visible) > 0.0001 ? Math.min(1, (t - visible * 0.9) / (dur - visible)) : 0;
+    clampViewScroll();
+  }
+}
+
 function snapTime(t) {
   const mode = state.comp.snap;
   if (mode === 'none') return t;
@@ -1571,6 +1656,7 @@ function snapTime(t) {
 function setTimelineTime(t, opts = {}) {
   const next = opts.snap ? snapTime(t) : t;
   state.play.time = clamp(next, 0, state.comp.duration);
+  if (opts.autopan !== false) ensurePlayheadVisible();
   updateTimelineVisuals();
 }
 
@@ -2003,9 +2089,11 @@ function rebuildTimelineRuler() {
 }
 
 function addRulerTick(t, major, label) {
+  const pct = timeToPct(t);
+  if (pct < -2 || pct > 102) return;
   const tick = document.createElement('div');
   tick.className = 'ruler-tick' + (major ? ' major' : '');
-  tick.style.left = (t / state.comp.duration * 100).toFixed(3) + '%';
+  tick.style.left = pct.toFixed(3) + '%';
   if (label) tick.innerHTML = `<span>${label}</span>`;
   timelineRuler.appendChild(tick);
 }
@@ -2041,18 +2129,20 @@ function drawWaveformCanvas(canvas) {
   ctx.stroke();
 
   const mid = h * 0.5;
-  const maxTime = Math.max(state.comp.duration, 0.001);
-  const visible = Math.min(1, waveform.duration / maxTime);
-  const visibleW = Math.max(1, Math.floor(w * visible));
   const peaks = waveform.peaks;
+  const audioDur = waveform.duration;
   // gradient fill mirrored
   const grad = ctx.createLinearGradient(0, 0, 0, h);
   grad.addColorStop(0, 'rgba(106, 134, 216, 0.95)');
   grad.addColorStop(0.5, 'rgba(136, 216, 163, 0.85)');
   grad.addColorStop(1, 'rgba(106, 134, 216, 0.95)');
   ctx.fillStyle = grad;
-  for (let x = 0; x < visibleW; x++) {
-    const idx = Math.min(peaks.length - 1, Math.floor(x / visibleW * peaks.length));
+  const viewStart = viewStartTime();
+  const viewVis = viewVisibleDuration();
+  for (let x = 0; x < w; x++) {
+    const t = viewStart + (x / Math.max(1, w)) * viewVis;
+    if (t < 0 || t > audioDur) continue;
+    const idx = Math.min(peaks.length - 1, Math.max(0, Math.floor((t / audioDur) * peaks.length)));
     const amp = clamp(peaks[idx] || 0, 0, 1);
     const y = Math.max(1, amp * (mid - 1));
     ctx.fillRect(x, mid - y, 1, y * 2);
@@ -2060,16 +2150,17 @@ function drawWaveformCanvas(canvas) {
 }
 
 function updateTimelineVisuals() {
-  const duration = Math.max(0.001, state.comp.duration);
-  playhead.style.left = (state.play.time / duration * 100).toFixed(3) + '%';
+  playhead.style.left = timeToPct(state.play.time).toFixed(3) + '%';
   if (loopRangeEl) {
-    const left = state.comp.inPoint / duration * 100;
-    const right = state.comp.outPoint / duration * 100;
+    const left = timeToPct(state.comp.inPoint);
+    const right = timeToPct(state.comp.outPoint);
     loopRangeEl.style.left = left.toFixed(3) + '%';
     loopRangeEl.style.width = Math.max(0, right - left).toFixed(3) + '%';
   }
-  if (inMarkerEl) inMarkerEl.style.left = (state.comp.inPoint / duration * 100).toFixed(3) + '%';
-  if (outMarkerEl) outMarkerEl.style.left = (state.comp.outPoint / duration * 100).toFixed(3) + '%';
+  if (inMarkerEl) inMarkerEl.style.left = timeToPct(state.comp.inPoint).toFixed(3) + '%';
+  if (outMarkerEl) outMarkerEl.style.left = timeToPct(state.comp.outPoint).toFixed(3) + '%';
+  updatePreviewSeekUI();
+  updateZoomScrollbarUI();
 }
 
 function setDuration(v) {
@@ -2116,7 +2207,7 @@ function timeFromRulerEvent(e) {
   const ref = e.currentTarget && e.currentTarget.getBoundingClientRect ? e.currentTarget : timelineRuler;
   const rect = ref.getBoundingClientRect();
   const x = clamp(e.clientX - rect.left, 0, rect.width);
-  return x / Math.max(1, rect.width) * state.comp.duration;
+  return pctToTime(x / Math.max(1, rect.width) * 100);
 }
 
 function updateSceneControls() {
@@ -2205,6 +2296,108 @@ timelineWaveEl.addEventListener('pointerup', e => {
 });
 window.addEventListener('resize', () => {
   if (state.audio.waveform) requestAnimationFrame(() => drawWaveformCanvas(document.getElementById('waveCanvas')));
+});
+
+// Zoom + scroll wiring
+const thTrackEl = document.getElementById('thTrack');
+const zoomReadoutEl = document.getElementById('zoomReadout');
+const sbTrackEl = document.getElementById('sbTrack');
+const sbThumbEl = document.getElementById('sbThumb');
+
+function updateZoomScrollbarUI() {
+  if (zoomReadoutEl) zoomReadoutEl.textContent = 'x' + (state.view.zoom || 1).toFixed(1);
+  if (sbThumbEl && sbTrackEl) {
+    const z = state.view.zoom || 1;
+    const w = sbTrackEl.clientWidth;
+    const thumbW = Math.max(18, w / z);
+    const left = state.view.scroll * Math.max(0, w - thumbW);
+    sbThumbEl.style.width = thumbW + 'px';
+    sbThumbEl.style.left = left + 'px';
+  }
+}
+
+function repaintTimelineAfterView() {
+  rebuildTimelineRuler();
+  buildTimeline();
+}
+
+function applyZoom(deltaSign, anchorTime) {
+  const oldZoom = state.view.zoom || 1;
+  const factor = deltaSign > 0 ? 1.25 : 1 / 1.25;
+  setViewZoom(oldZoom * factor, anchorTime);
+  repaintTimelineAfterView();
+}
+
+function timeFromTrackEvent(e) {
+  const rect = thTrackEl.getBoundingClientRect();
+  const x = clamp(e.clientX - rect.left, 0, rect.width);
+  return pctToTime(x / Math.max(1, rect.width) * 100);
+}
+
+[thTrackEl, document.getElementById('timelineList')].forEach(target => {
+  if (!target) return;
+  target.addEventListener('wheel', e => {
+    if (e.ctrlKey) {
+      e.preventDefault();
+      const anchor = timeFromTrackEvent(e);
+      applyZoom(-Math.sign(e.deltaY), anchor);
+    } else if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+      // horizontal trackpad scroll
+      e.preventDefault();
+      const dur = Math.max(0.001, state.comp.duration);
+      const visible = viewVisibleDuration();
+      const denom = Math.max(0.0001, dur - visible);
+      state.view.scroll = clamp(state.view.scroll + e.deltaX / denom / 200, 0, 1);
+      repaintTimelineAfterView();
+    } else if (e.shiftKey) {
+      e.preventDefault();
+      const dur = Math.max(0.001, state.comp.duration);
+      const visible = viewVisibleDuration();
+      const denom = Math.max(0.0001, dur - visible);
+      state.view.scroll = clamp(state.view.scroll + e.deltaY / denom / 200, 0, 1);
+      repaintTimelineAfterView();
+    }
+  }, {passive: false});
+});
+
+if (sbTrackEl && sbThumbEl) {
+  let sbDrag = null;
+  sbThumbEl.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    sbThumbEl.setPointerCapture(e.pointerId);
+    sbDrag = {startX: e.clientX, startScroll: state.view.scroll};
+  });
+  sbThumbEl.addEventListener('pointermove', e => {
+    if (!sbDrag) return;
+    const w = sbTrackEl.clientWidth;
+    const z = state.view.zoom || 1;
+    const thumbW = Math.max(18, w / z);
+    const range = Math.max(1, w - thumbW);
+    state.view.scroll = clamp(sbDrag.startScroll + (e.clientX - sbDrag.startX) / range, 0, 1);
+    repaintTimelineAfterView();
+  });
+  sbThumbEl.addEventListener('pointerup', e => {
+    sbDrag = null;
+    try { sbThumbEl.releasePointerCapture(e.pointerId); } catch (err) {}
+  });
+  sbTrackEl.addEventListener('click', e => {
+    if (e.target === sbThumbEl) return;
+    const rect = sbTrackEl.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const w = rect.width;
+    const z = state.view.zoom || 1;
+    const thumbW = Math.max(18, w / z);
+    const range = Math.max(1, w - thumbW);
+    state.view.scroll = clamp((x - thumbW / 2) / range, 0, 1);
+    repaintTimelineAfterView();
+  });
+}
+
+document.getElementById('zoomInBtn').addEventListener('click', () => applyZoom(1, state.play.time));
+document.getElementById('zoomOutBtn').addEventListener('click', () => applyZoom(-1, state.play.time));
+document.getElementById('zoomResetBtn').addEventListener('click', () => {
+  state.view.zoom = 1; state.view.scroll = 0;
+  repaintTimelineAfterView();
 });
 
 // ===================================================================
@@ -3008,19 +3201,21 @@ function buildTimeline() {
     const def = effectDef(layer.effId);
     if (!def) return;
     normalizeLayerClip(layer);
-    const inPct = layer.start / state.comp.duration * 100;
-    const outPct = layer.end / state.comp.duration * 100;
+    const inPct = timeToPct(layer.start);
+    const outPct = timeToPct(layer.end);
     const row = document.createElement('div');
     row.className = 'lane-row' +
       (layer.enabled ? ' on' : '') +
       (state.selectedLayerId === layer.lid ? ' selected' : '');
     row.innerHTML = `
-      <span class="num">${String(idx + 1).padStart(2,'0')}</span>
-      <button class="mvbtn" data-act="open">${layer.open ? '▼' : '▶'}</button>
-      <input type="checkbox" ${layer.enabled?'checked':''} aria-label="${def.name} 有効">
-      <span class="lane-name">${def.name}</span>
-      <button class="mvbtn" data-act="up">▲</button>
-      <button class="mvbtn" data-act="down">▼</button>
+      <div class="lane-controls">
+        <span class="num">${String(idx + 1).padStart(2,'0')}</span>
+        <button class="mvbtn" data-act="open">${layer.open ? '▼' : '▶'}</button>
+        <input type="checkbox" ${layer.enabled?'checked':''} aria-label="${def.name} 有効">
+        <span class="lane-name">${def.name}</span>
+        <button class="mvbtn" data-act="up">▲</button>
+        <button class="mvbtn" data-act="down">▼</button>
+      </div>
       <div class="lane-track">
         <div class="lane-bar" data-lid="${layer.lid}" style="left:${inPct.toFixed(3)}%;width:${Math.max(0, outPct - inPct).toFixed(3)}%;">
           <button class="clip-handle start" data-edge="start" aria-label="clip start"></button>
@@ -3060,7 +3255,7 @@ function renderLayerKeys(layer) {
         state.selectedKey.lid === layer.lid &&
         state.selectedKey.paramKey === paramKey &&
         state.selectedKey.idx === idx;
-      keys.push(`<button class="key-marker ${selected ? 'selected' : ''}" data-lid="${layer.lid}" data-param="${paramKey}" data-idx="${idx}" style="left:${(key.t / state.comp.duration * 100).toFixed(3)}%"></button>`);
+      keys.push(`<button class="key-marker ${selected ? 'selected' : ''}" data-lid="${layer.lid}" data-param="${paramKey}" data-idx="${idx}" style="left:${timeToPct(key.t).toFixed(3)}%"></button>`);
     });
   });
   return keys.join('');
@@ -3068,8 +3263,8 @@ function renderLayerKeys(layer) {
 
 function updateClipBarStyle(bar, layer) {
   normalizeLayerClip(layer);
-  const left = layer.start / state.comp.duration * 100;
-  const right = layer.end / state.comp.duration * 100;
+  const left = timeToPct(layer.start);
+  const right = timeToPct(layer.end);
   bar.style.left = left.toFixed(3) + '%';
   bar.style.width = Math.max(0, right - left).toFixed(3) + '%';
 }
@@ -3104,7 +3299,7 @@ function setupClipDrag(bar) {
     bar.setPointerCapture(e.pointerId);
     const move = ev => {
       const rect = track.getBoundingClientRect();
-      const dx = (ev.clientX - startX) / Math.max(1, rect.width) * state.comp.duration;
+      const dx = (ev.clientX - startX) / Math.max(1, rect.width) * viewVisibleDuration();
       if (mode === 'start') {
         const nextStart = clamp(snapTime(initialStart + dx), 0, initialEnd - minLen);
         setLayerClip(layer, nextStart, initialEnd);
@@ -3138,16 +3333,18 @@ function buildParamRows(layer, def) {
     const row = document.createElement('div');
     row.className = 'lane-row param' + (graph ? ' graph' : '') + (state.selectedLayerId === layer.lid ? ' selected' : '');
     row.innerHTML = `
-      <span class="num">${String(keys.length).padStart(2,'0')}</span>
-      <span class="lane-name">${param.label}</span>
-      <button class="mvbtn" data-act="add-key">◆</button>
-      ${graphable ? `<button class="mvbtn" data-act="graph">${graph ? 'G*' : 'G'}</button>` : '<span class="num"></span>'}
+      <div class="lane-controls">
+        <span class="num">${String(keys.length).padStart(2,'0')}</span>
+        <span class="lane-name">${param.label}</span>
+        <button class="mvbtn" data-act="add-key">◆</button>
+        ${graphable ? `<button class="mvbtn" data-act="graph">${graph ? 'G*' : 'G'}</button>` : '<span class="num"></span>'}
+      </div>
       <div class="lane-track">${graph ? renderGraphTrack(layer, param, keys) : keys.map((key, idx) => {
         const selected = state.selectedKey &&
           state.selectedKey.lid === layer.lid &&
           state.selectedKey.paramKey === param.key &&
           state.selectedKey.idx === idx;
-        return `<button class="key-marker ${selected ? 'selected' : ''}" data-lid="${layer.lid}" data-param="${param.key}" data-idx="${idx}" style="left:${(key.t / state.comp.duration * 100).toFixed(3)}%"></button>`;
+        return `<button class="key-marker ${selected ? 'selected' : ''}" data-lid="${layer.lid}" data-param="${param.key}" data-idx="${idx}" style="left:${timeToPct(key.t).toFixed(3)}%"></button>`;
       }).join('')}</div>
     `;
     row.querySelector('[data-act=add-key]').addEventListener('click', e => {
@@ -3191,7 +3388,7 @@ function graphPointPosition(param, key) {
   const max = param.max ?? 1;
   const norm = max === min ? 0 : clamp((parseFloat(key.v) - min) / (max - min), 0, 1);
   return {
-    x: key.t / state.comp.duration * 100,
+    x: timeToPct(key.t),
     y: (1 - norm) * 100
   };
 }
@@ -3217,8 +3414,10 @@ function drawGraphCanvas(canvas, layer, param) {
   ctx.strokeStyle = '#88d8a3';
   ctx.lineWidth = 2;
   ctx.beginPath();
+  const viewStart = viewStartTime();
+  const viewVis = viewVisibleDuration();
   for (let x = 0; x <= w; x++) {
-    const t = x / Math.max(1, w) * state.comp.duration;
+    const t = viewStart + (x / Math.max(1, w)) * viewVis;
     const v = sampleKeyframes(layer.values[param.key], keys, t);
     const pos = graphPointPosition(param, {t, v});
     const y = pos.y / 100 * h;
@@ -3251,7 +3450,7 @@ function setupGraphPoint(point, param) {
       const rect = track.getBoundingClientRect();
       const x = clamp(ev.clientX - rect.left, 0, rect.width);
       const y = clamp(ev.clientY - rect.top, 0, rect.height);
-      key.t = clamp(snapTime(x / Math.max(1, rect.width) * state.comp.duration), 0, state.comp.duration);
+      key.t = clamp(snapTime(pctToTime(x / Math.max(1, rect.width) * 100)), 0, state.comp.duration);
       const min = param.min ?? 0;
       const max = param.max ?? 1;
       key.v = min + (1 - y / Math.max(1, rect.height)) * (max - min);
@@ -3294,11 +3493,11 @@ function setupKeyMarker(marker) {
     const move = ev => {
       const rect = track.getBoundingClientRect();
       const x = clamp(ev.clientX - rect.left, 0, rect.width);
-      const t = x / Math.max(1, rect.width) * state.comp.duration;
+      const t = pctToTime(x / Math.max(1, rect.width) * 100);
       moveKey(marker.dataset.lid, marker.dataset.param, parseInt(marker.dataset.idx, 10), t, false);
       const layer = layerState(marker.dataset.lid);
       const key = layer?.keyframes[marker.dataset.param]?.[parseInt(marker.dataset.idx, 10)];
-      if (key) marker.style.left = (key.t / state.comp.duration * 100).toFixed(3) + '%';
+      if (key) marker.style.left = timeToPct(key.t).toFixed(3) + '%';
     };
     const up = ev => {
       try { marker.releasePointerCapture(ev.pointerId); } catch (err) {}
@@ -3483,22 +3682,45 @@ function makeLayerFftPanel(layer) {
   return panel;
 }
 
+function setParamValueAtPlayhead(layer, paramKey, value) {
+  const keys = layer.keyframes && layer.keyframes[paramKey];
+  if (keys && keys.length) {
+    const t = snapTime(state.play.time);
+    const tol = 1 / 120;
+    const existing = keys.findIndex(k => Math.abs(k.t - t) < tol);
+    if (existing >= 0) {
+      keys[existing].v = value;
+    } else {
+      keys.push({t, v: value});
+      sortedKeyframes(layer, paramKey);
+    }
+    layer.values[paramKey] = value;
+    return true;
+  }
+  layer.values[paramKey] = value;
+  return false;
+}
+
 function makeRange(layer, p) {
   const row = document.createElement('div');
   row.className = 'row';
   const lab = document.createElement('label'); lab.textContent = p.label;
   const inp = document.createElement('input');
   inp.type = 'range'; inp.min = p.min; inp.max = p.max; inp.step = p.step || 0.01;
-  inp.value = layer.values[p.key] ?? 0;
+  const initial = (layer.keyframes && layer.keyframes[p.key] && layer.keyframes[p.key].length)
+    ? sampleKeyframes(layer.values[p.key], sortedKeyframes(layer, p.key), state.play.time)
+    : layer.values[p.key] ?? 0;
+  inp.value = initial;
   const v = document.createElement('span'); v.className = 'v';
-  v.textContent = (+inp.value).toFixed(2);
+  v.textContent = (+initial).toFixed(2);
   let before = null;
   inp.addEventListener('pointerdown', () => { before = snapshotState(); });
   inp.addEventListener('pointerup', () => setTimeout(() => { before = null; }, 300));
   inp.addEventListener('input', () => {
     if (!before) before = snapshotState();
-    layer.values[p.key] = parseFloat(inp.value);
-    v.textContent = parseFloat(inp.value).toFixed(2);
+    const val = parseFloat(inp.value);
+    setParamValueAtPlayhead(layer, p.key, val);
+    v.textContent = val.toFixed(2);
     scheduleParamHistory('Change parameter', before);
   });
   const keyBtn = document.createElement('button');
@@ -3519,13 +3741,16 @@ function makeColor(layer, x) {
   row.className = 'row';
   const lab = document.createElement('label'); lab.textContent = x.label;
   const inp = document.createElement('input');
-  inp.type = 'color'; inp.value = layer.values[x.key] || x.def;
+  const initial = (layer.keyframes && layer.keyframes[x.key] && layer.keyframes[x.key].length)
+    ? sampleKeyframes(layer.values[x.key] || x.def, sortedKeyframes(layer, x.key), state.play.time)
+    : (layer.values[x.key] || x.def);
+  inp.type = 'color'; inp.value = initial;
   let before = null;
   inp.addEventListener('pointerdown', () => { before = snapshotState(); });
   inp.addEventListener('pointerup', () => setTimeout(() => { before = null; }, 300));
   inp.addEventListener('input', () => {
     if (!before) before = snapshotState();
-    layer.values[x.key] = inp.value;
+    setParamValueAtPlayhead(layer, x.key, inp.value);
     scheduleParamHistory('Change color', before);
   });
   const keyBtn = document.createElement('button');
@@ -3902,6 +4127,19 @@ document.addEventListener('keydown', e => {
   }
   if (e.key === 'h') {
     document.getElementById('hidePanelBtn').click();
+  }
+  if (e.key === '=' || e.key === '+') {
+    e.preventDefault();
+    applyZoom(1, state.play.time);
+  }
+  if (e.key === '-' || e.key === '_') {
+    e.preventDefault();
+    applyZoom(-1, state.play.time);
+  }
+  if (e.key === '\\') {
+    e.preventDefault();
+    state.view.zoom = 1; state.view.scroll = 0;
+    repaintTimelineAfterView();
   }
 });
 

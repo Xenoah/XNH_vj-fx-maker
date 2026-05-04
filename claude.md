@@ -110,6 +110,138 @@
 - [x] **In/Out をエフェクトごとに**: Effect Controls に "Layer In / Out" サブパネル (数値入力 + @playhead ボタン + full)。`Shift+I` / `Shift+O` で選択レイヤー In/Out をプレイヘッドに設定 (素の `I` / `O` はコンポ用)。右クリックメニューに「現在時刻を Layer In/Out」追加。
 - [x] **プリセット v4**: `version: 4`、各レイヤーに `fft` 同梱、`audioTrigger.gain` 追加。v1/v2/v3 を互換読込 (グローバル `audioTrigger` を fallback として全レイヤーに転写)。
 
+### Phase 13 — タイムライン拡大縮小 + オーディオ同期 + 再生コントロール再配置  ⏳
+- [ ] **タイムライン拡大縮小**: 表示用ビューポート `state.view = {zoom, scroll}` を導入し、ルーラー / 波形 / クリップバー / キーフレームの位置計算をすべて `viewportPctFromTime(t)` 経由に統一
+  - マウスホイール = 横スクロール、`Ctrl + ホイール` = カーソル位置を中心にズーム
+  - `+` / `-` キーでズーム、`\` でズームリセット (= 全幅フィット)
+  - タイムライン下端に水平スクロールバー (現在位置 + ズーム率)
+  - ズーム時もプレイヘッドが画面外に出たら自動スクロール (auto-pan during playback)
+  - 目盛り (ruler tick) は表示密度に応じて間隔を自動調整 (1s → 0.5s → 0.1s → 1f)
+- [ ] **オーディオをタイムシークバーと連動**:
+  - 再生開始/停止/シークで `audio.elem.currentTime = state.play.time + offset` を反映
+  - スクラブ中は audio 一時停止 (高速ジャンプによるノイズ回避)、ドロップ後に再開
+  - 再生中はリアルタイム監視: `Math.abs(audio.elem.currentTime - state.play.time) > 0.05` で再同期
+  - audio item ごとに `offset` (秒) を持たせ、コンポ 0 と音声先頭をずらせるように
+  - ループ時 (`outPoint` 到達 → `inPoint` ジャンプ) も audio.currentTime を巻き戻し
+- [ ] **再生コントロールをプレビュー直下へ移動**:
+  - センターペインの canvas 直下に `#previewControls` バーを新設
+  - 含めるコントロール: 巻戻し / 1f戻し / 再生・停止 / 1f送り / 早送り / ループトグル / In マーク / Out マーク / 現在時刻 (timecode) / 全体長
+  - 上部ツールバーからは transport ボタン群を撤去 (素材/プリセット/録画/MIDI 等のグローバル系のみ残す)
+  - キーボード操作 (Space, ← →, J K L 等) は従来通り受け付ける
+- [ ] 付随仕様: タイムライン HUD に「ズーム率」「可視範囲 (例: 0.50–4.20s)」を表示
+
+### Phase 14 — ファイルプール (Project パネル) + マルチソース対応  ⏳
+- [ ] **左ペインに Project パネル (素材プール)** を新設
+  - リスト項目: 種別アイコン (image/video/audio) + サムネ + 名称 + duration / 解像度
+  - ドラッグ&ドロップで追加、複数選択追加、削除、リネーム
+  - クリックで選択 / ダブルクリックで「現在のソース」(映像 or 音声) に割当
+  - 既存のエフェクトライブラリは Project の下に Effects パネルとして同居 (既存の左ペインを 2 ペインに分割)
+- [ ] **マルチソース状態モデル** (旧 `state.source` を `state.pool` + `state.activeSource` へ置換):
+  ```js
+  state.pool = {
+    items: [
+      {id, kind: 'image'|'video'|'audio'|'demo', name, url, file, dataUrl?, duration?, width?, height?, thumb?},
+      ...
+    ],
+    activeVideoId: null,    // 映像ソースとして選ばれている item の id
+    activeAudioId: null,    // 音声ソースとして選ばれている item の id
+    nextItemSeq: 1
+  }
+  ```
+- [ ] **同時編集**: 複数の audio/video/image 項目を保持しつつ、現在の活性ソースだけが描画 / 再生に使われる。切替のたびに `state.source.dirty = true` でテクスチャを更新
+- [ ] **動画/画像のサムネイル生成**: 読込時に 2D canvas にダウンスケール描画し、Project リストに表示
+- [ ] **音声波形キャッシュ**: audio item 毎に peaks 配列を保持し、active 切替時に `rebuildTimelineRuler()` を呼んで波形を入れ替え
+- [ ] **(任意/将来)**: レイヤーごとに source override (現在は global activeVideoId)。今フェーズではスコープ外
+- [ ] 付随仕様: メモリ対策として動画ファイル本体は `URL.createObjectURL()` のみ保持し、プロジェクト保存時に「埋込/参照」を選択可能 (Phase 16 と連動)
+
+### Phase 15 — After Effects 互換キーバインド  ⏳
+- [ ] **トランスポート系**:
+  - Space: 再生/停止 (既存)
+  - `J` / `K` / `L`: 巻戻し / 停止 / 早送り (シャトル風、複数回押下で速度段階)
+  - `Page Up` / `Page Down`: 1f 前 / 1f 後 (← →は維持)
+  - `Shift + Page Up` / `Page Down`: 10f 前 / 10f 後
+  - `Home` / `End`: コンポ先頭 / 末尾 (既存)
+  - `Shift + Home` / `End`: 直前/直後のキーフレーム
+- [ ] **In/Out マーカー系**:
+  - `B` / `N`: ワークエリア (= comp In/Out) を「現在時刻に開始」/「現在時刻で終了」
+  - `I` / `O`: コンポ In/Out (既存)
+  - `Shift + I` / `Shift + O`: レイヤー In/Out (既存)
+  - `[` / `]`: 選択レイヤー In/Out をプレイヘッドにトリム
+  - `Alt + [` / `]`: 選択レイヤー全体をプレイヘッド位置にスライド
+- [ ] **編集系**:
+  - `Ctrl + D`: 選択レイヤー複製 (既存ツールバーボタンと統一)
+  - `Ctrl + Shift + D`: 選択レイヤーをプレイヘッドで分割 (新規実装、内部的に複製 + 各 In/Out 調整)
+  - `Delete` / `Backspace`: 選択レイヤー or 選択キー削除 (既存)
+  - `F2` / `Enter`: 選択レイヤーをリネーム (新規 `layer.label` フィールド)
+  - `Ctrl + A`: 全レイヤー選択 (将来の複数選択対応の足場)
+  - `Ctrl + Z` / `Ctrl + Shift + Z` / `Ctrl + Y`: undo/redo (既存)
+- [ ] **表示系**:
+  - `;` (セミコロン): タイムラインを全幅にズームリセット
+  - `=` / `-`: タイムライン拡大 / 縮小 (Phase 13 と連動)
+  - `U`: 選択レイヤーの「キーフレームありプロパティ」のみ展開
+  - `UU`: 選択レイヤーの「変更されたプロパティ」のみ展開
+  - `S` / `T` / `R` / `P`: 透明度/位置/回転/スケール … VJ FX 用に `A=amount`, `S=speed`, `M=mix` にマッピング
+- [ ] **ヘルプ**: `?` で全キーバインド一覧オーバーレイ
+- [ ] 付随仕様: 入力ターゲットが `<input>` / `<select>` / `<textarea>` / `contenteditable` のときはホットキーを発火させない (一部既存)
+
+### Phase 16 — プロジェクト保存 / 読出  ⏳
+- [ ] **プロジェクトファイル形式 `.vjproj`** (内部は JSON):
+  ```json
+  {
+    "format": "vjfx-project",
+    "version": 1,
+    "savedAt": "2026-...",
+    "preset": { /* Phase 5 の preset v4 をそのまま埋込 */ },
+    "view": { "zoom": 1.0, "scroll": 0, "leftW": 280, "rightW": 330, "bottomH": 210 },
+    "pool": {
+      "activeVideoId": "P3",
+      "activeAudioId": "P5",
+      "items": [
+        {"id":"P3","kind":"video","name":"loop.mp4","embed":true,"dataUrl":"data:video/mp4;base64,..."},
+        {"id":"P5","kind":"audio","name":"track.wav","embed":false,"href":"./assets/track.wav"}
+      ]
+    },
+    "transport": { "time": 0, "loop": true }
+  }
+  ```
+- [ ] **保存**: メニュー / ショートカット (`Ctrl + S`) で `.vjproj` をダウンロード
+  - 「素材を埋め込む / 参照のみ」をダイアログで選択 (大容量警告: 動画 > 50MB は警告)
+  - 埋込時は `FileReader.readAsDataURL` で base64 化 (※ 動画は数十〜数百 MB に膨らむため明示確認)
+- [ ] **読出**: `Ctrl + O` で `.vjproj` を選択 → 既存状態を破棄して復元
+  - 参照モード (`href`) は `dataUrl` を持たないので、不在ならプロジェクトロード後に再添付ダイアログ
+  - `preset` 部分は既存の `importPreset()` パスを再利用 (v1〜v4 互換)
+- [ ] **プロジェクト名 + メタ**: `state.project = {name, savedAt, dirty}` を持ち、未保存変更時はタブタイトルに `*` を付ける
+- [ ] **新規プロジェクト** (`Ctrl + N`): 全状態を初期値に戻す
+- [ ] **直近プロジェクト** (任意): localStorage に最後に開いた `.vjproj` の名前 / handle を保持し、起動時に「再読込」ボタン
+- [ ] **自動保存** (任意/将来): 30 秒間アイドルで localStorage に圧縮版 (preset のみ、pool は除く) を保存
+
+---
+
+## Phase 13–16 実装上の注意 (将来作業の備忘)
+
+### タイムラインビューポート
+- 現状の `time → x%` 計算は `t / state.comp.duration * 100` で全箇所に直書き → 共通関数 `timeToPx(t)` / `pxToTime(x)` / `timeToPct(t)` に置換する。検索置換 1 度で済むよう、最初にラッパ関数を導入する。
+- ズーム時はキーフレームのドラッグ可能領域 (`.lane-track`) も同じ `timeToPct` で再計算しないと位置がずれる。
+- 波形の再描画は zoom/scroll 変更時にも必要 (ただし peaks 自体は同じ、サンプリング範囲だけ変わる)。
+
+### 音声同期
+- 現状 `<audio>` 要素は `loop=true` で勝手に回っている。`loop=false` に変えてコンポ側で巻戻しを管理する。
+- スクラブ中の `audio.currentTime` 連続代入はブラウザによってはクリック/ノイズが乗るので、scrub-pause-resume パターンを採用する。
+
+### ファイルプール
+- 現状 `state.source` は `{kind: 'image'|'video'|'demo', media, image}` の単一値。Pool 化に伴い `state.source` は「アクティブ項目の派生」に格下げし、項目自体は `state.pool.items[]` に置く。
+- WebGL テクスチャは `srcTex` 1 個だけ。ソース切替時は `texImage2D` で再アップロードする。
+- 動画 item は `<video>` 要素を pool 内で保持し続けないとシーク追従できない。隠し DOM (`display:none`) に格納するか、`HTMLVideoElement` を Map で持つ。
+
+### AE 互換キー
+- `KeyboardEvent.code` ベースで判定し、IME 入力中は無効化する。
+- `J/K/L` シャトルは「同じキー連打で速度段階」(2x→4x→...) を実装すると AE そっくりになる。
+- レイヤー分割 (`Ctrl+Shift+D`) は内部的に「複製 → 元レイヤーの end をプレイヘッドに / コピー側の start をプレイヘッドに」で実装可能。キーフレームは両側に複製。
+
+### プロジェクト保存
+- 現行 `preset v4` は将来 v5 (label, source per layer 等) に拡張する想定。プロジェクトの `version` は preset の version とは独立に管理する (preset を埋め込む形なので二重バージョニングになる点に注意)。
+- ファイル拡張子 `.vjproj` は MIME 紐付けがないため、ダウンロード時は `application/json` で出す。
+
 ---
 
 ## アーキテクチャ詳細
