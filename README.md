@@ -1,5 +1,7 @@
 # VJ FX Maker
 
+https://xenoah.github.io/XNH_vj-fx-maker/
+
 ブラウザ単体で動作する VJ 用エフェクトメーカー。`index.html` をダブルクリックで開くだけで起動します。
 外部 CDN・ライブラリ・ビルドは一切不要です。
 
